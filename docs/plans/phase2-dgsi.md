@@ -126,7 +126,27 @@
 - [ ] Connect `lawyerr dgsi courts` command to list all courts with aliases
 - [ ] Progress bars via `indicatif` for multi-court search and `--fetch-full`
 
-### Verification
+### Unit Tests
+- [ ] Test `Court::from_alias()` — all aliases resolve correctly, unknown aliases return None
+- [ ] Test `Court::search_url()` — generates correct URL with all params
+- [ ] Test `build_query()` — with/without dates, with/without field filter, `--recent` shorthand
+- [ ] Test search results parser against `tests/fixtures/dgsi_search_results.html`:
+  - Correct total count parsed from `<h4>`
+  - Correct number of results parsed
+  - Each result has valid date, processo, relator, descriptors, relevance %
+  - Portuguese characters decoded correctly (ã, ç, õ, é)
+- [ ] Test decision parser against `tests/fixtures/dgsi_decision.html`:
+  - All fields extracted (sumário, decisão, texto integral, etc.)
+  - HTML tags stripped from values
+- [ ] Test markdown output format matches expected structure
+- [ ] All tests use `MockHttpFetcher` — no network calls
+
+### Integration Tests (`#[ignore]`)
+- [ ] Test live search against STJ with known query
+- [ ] Test live decision fetch for known URL
+- [ ] Test multi-court parallel search
+
+### Verification (manual)
 - [ ] `lawyerr dgsi courts` — lists all 10 courts with aliases
 - [ ] `lawyerr dgsi search "usucapião" --court stj --limit 5` — returns 5 results from STJ
 - [ ] `lawyerr dgsi search "usucapião" --court stj --format json` — valid JSON output
@@ -142,8 +162,10 @@
 
 **Parsing strategy:** Use `scraper` crate with CSS selectors. Don't regex HTML. Parse once, extract into typed structs.
 
-**Latin-1 decoding:** Always use `HttpClient::get_latin1()` for DGSI requests. The `encoding_rs` crate handles this. Decode BEFORE parsing with `scraper`.
+**Latin-1 decoding:** Always use `HttpFetcher::get()` → decode bytes with `encoding_rs` in DGSI's parsing layer. Decode BEFORE parsing with `scraper`.
 
 **URL construction:** All URLs must use HTTPS. The base is always `https://www.dgsi.pt/`.
 
 **Date format gotcha:** DGSI uses `MM/DD/YYYY` (American format), not `DD/MM/YYYY`. Parse accordingly with `chrono::NaiveDate::parse_from_str(s, "%m/%d/%Y")`.
+
+**Trait-based HTTP:** All DGSI functions accept `&dyn HttpFetcher`, not `&HttpClient`. This allows unit testing with `MockHttpFetcher` returning fixture HTML files. See Phase 1 testability section.

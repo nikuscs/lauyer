@@ -40,20 +40,22 @@
 - [ ] Define `DrSession` struct:
   ```rust
   struct DrSession {
-      http_client: reqwest::Client,  // with cookie jar
+      http_client: HttpClient,       // shared HttpClient from Phase 1 (owns cookie jar)
       module_version: String,
       csrf_token: String,
-      api_version: String,  // "6Bnghy+TVcnOZSN2FpzXbQ"
+      api_version: String,           // "6Bnghy+TVcnOZSN2FpzXbQ"
+      body_template: serde_json::Value, // parsed from dr_request_template.json, reused per search
   }
   ```
-- [ ] Implement `DrSession::new(config: &HttpConfig) -> Result<Self>`:
-  1. Create reqwest client with cookie jar (`Arc<reqwest::cookie::Jar>`)
+- [ ] Implement `DrSession::new(http_client: HttpClient) -> Result<Self>`:
+  1. Use the shared `HttpClient` (which already has cookie jar, proxy, timeout)
   2. `GET /dr/moduleservices/moduleversioninfo` → extract `versionToken`
-  3. `GET /dr/moduleservices/roles` with header `X-CSRFToken: T6C+9iB49TLra4jEsMeSckDMNhQ=` → cookies get set
+  3. `GET /dr/moduleservices/roles` with header `X-CSRFToken: T6C+9iB49TLra4jEsMeSckDMNhQ=` → cookies get set automatically on the shared jar
   4. Store CSRF token (hardcoded `T6C+9iB49TLra4jEsMeSckDMNhQ=` for anonymous)
   5. Store API version (hardcoded `6Bnghy+TVcnOZSN2FpzXbQ` — may need refresh logic)
-- [ ] Implement `DrSession::refresh(&mut self) -> Result<()>` — re-init if session expires
-- [ ] Implement version staleness detection: if response has `hasApiVersionChanged: true`, log warning
+  6. Parse body template from embedded `include_str!`, strip `_comment` fields, store as `serde_json::Value`
+- [ ] Implement `DrSession::refresh(&mut self) -> Result<()>` — re-fetches version + roles
+- [ ] Implement version staleness detection: if response has `hasApiVersionChanged: true`, auto-refresh and retry once
 
 ### Search Parameters Builder (`src/dr/search.rs` — builder part)
 - [ ] Define `DrSearchParams`:
@@ -166,7 +168,29 @@
   - Runs a search with no filters, extracts `TipoAtoAgg` buckets, displays available types with counts
 - [ ] Connect `lawyerr dr fetch` command (if individual document fetching is needed)
 
-### Verification
+### Unit Tests
+- [ ] Test `DrContentType::tipo_conteudo()` — returns correct PascalCase values
+- [ ] Test `DrContentType::from_alias()` — all aliases resolve correctly
+- [ ] Test `build_cookie_filtros()` — produces compact JSON, correct base64
+- [ ] Test `build_pesquisa_cookie()` — correct double-encoding (JSON-as-string for bools/sort)
+- [ ] Test `build_body_filtros()` — all lists use `{"List":[], "EmptyListItem":""}` format, numbers are strings
+- [ ] Test `build_search_body()` — all 3 variable locations are consistent (see "How Variables Flow")
+- [ ] Test response parser against `tests/fixtures/dr_search_response.json`:
+  - `data.Resultado` parsed as JSON string (double-parse)
+  - Correct total count
+  - `_source` fields extracted correctly
+  - Aggregation buckets parsed
+- [ ] Test HTML stripping from `sumario` field
+- [ ] Test session initialization (with mock returning expected version/roles responses)
+- [ ] All tests use `MockHttpFetcher` — no network calls
+
+### Integration Tests (`#[ignore]`)
+- [ ] Test live session init (moduleversioninfo + roles)
+- [ ] Test live search for AtosSerie1 Portarias
+- [ ] Test live search for AtosSerie2
+- [ ] Test live text search with `texto` field
+
+### Verification (manual)
 - [ ] `lawyerr dr search --content atos-1 --recent 1w` — returns individual acts from past week
 - [ ] `lawyerr dr search --content atos-1 --type portaria --recent 1w` — only Portarias
 - [ ] `lawyerr dr search "trabalho" --content atos-1 --recent 1m` — text search works
@@ -191,3 +215,7 @@
 **Double-encoded strings:** `PesquisaAvancadaBools` and `SortFields` in the cookie wrapper are JSON-as-string (double-encoded). In Rust: `serde_json::to_string(&bools_map)` gives you the inner JSON string, then put that string as a value in the outer JSON.
 
 **Response parsing:** `data.Resultado` is a JSON string, not a nested object. You need to deserialize the outer response first, then `serde_json::from_str(&resultado_string)` for the inner ES results.
+
+**Trait-based HTTP:** `DrSession` wraps `HttpClient` (which implements `HttpFetcher`). For unit tests, create a `DrSession` with a mock client. The session init calls (`moduleversioninfo`, `roles`) and search POST can all be mocked by providing canned responses.
+
+**`DrSession` owns the `HttpClient`**, not a reference. This avoids lifetime issues. In server mode, the `DrSession` lives in `AppState` behind `RwLock`.

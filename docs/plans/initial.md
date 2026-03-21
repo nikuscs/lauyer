@@ -268,11 +268,11 @@ Set `true` for whichever content types are selected. Groups are exclusive: selec
 
 ```json
 [
-  {"field": "dataPublicacao", "order": "desc"},
-  {"field": "numeroDR.keyword", "order": "desc"},
-  {"field": "serieNR", "order": "asc"},
-  {"field": "suplemento", "order": "asc"},
-  {"field": "apendice.keyword", "order": "asc"}
+  {"Field": "dataPublicacao", "Order": "desc"},
+  {"Field": "numeroDR.keyword", "Order": "desc"},
+  {"Field": "serieNR", "Order": "asc"},
+  {"Field": "suplemento", "Order": "asc"},
+  {"Field": "apendice.keyword", "Order": "asc"}
 ]
 ```
 
