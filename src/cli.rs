@@ -18,9 +18,9 @@ pub struct Cli {
     #[arg(long)]
     pub proxy: Option<String>,
 
-    /// Output format
-    #[arg(long, default_value = "markdown", value_enum)]
-    pub format: crate::format::OutputFormat,
+    /// Output format (auto-detected from --output extension if not set)
+    #[arg(long, value_enum)]
+    pub format: Option<crate::format::OutputFormat>,
 
     /// Write output to file
     #[arg(long)]

@@ -49,9 +49,15 @@ impl FromStr for OutputFormat {
 // Renderable trait
 // ---------------------------------------------------------------------------
 
-pub trait Renderable {
+pub trait Renderable: Send {
     fn to_markdown(&self) -> String;
     fn to_json(&self) -> serde_json::Value;
+
+    /// Return column headers and row values for table rendering.
+    /// If not implemented, the table renderer falls back to JSON keys/values.
+    fn table_row(&self) -> Option<(Vec<&str>, Vec<String>)> {
+        None
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -138,38 +144,47 @@ fn render_json(response: &SearchResponse, compact: bool, strip_sw: bool) -> Stri
     serde_json::to_string_pretty(&wrapper).unwrap_or_else(|_| "{}".to_owned())
 }
 
-fn render_table(response: &SearchResponse, compact: bool, strip_sw: bool) -> String {
-    let mut rows: Vec<Vec<String>> = Vec::new();
+/// Maximum column width before truncation.
+const MAX_COL_WIDTH: usize = 50;
 
-    for result in &response.results {
-        let v = result.to_json();
-        if let Some(obj) = v.as_object() {
-            let row: Vec<String> = obj
-                .values()
-                .map(|val| {
-                    let s = match val {
-                        serde_json::Value::String(s) => s.clone(),
-                        other => other.to_string(),
-                    };
-                    post_process(s, compact, strip_sw)
-                })
-                .collect();
-            rows.push(row);
-        }
+fn truncate(s: &str, max: usize) -> String {
+    if s.len() <= max {
+        return s.to_owned();
     }
+    let mut end = max.saturating_sub(3);
+    // Avoid splitting in the middle of a multi-byte character.
+    while end > 0 && !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    let mut truncated = s[..end].to_owned();
+    truncated.push_str("...");
+    truncated
+}
 
-    if rows.is_empty() {
+fn render_table(response: &SearchResponse, compact: bool, strip_sw: bool) -> String {
+    if response.results.is_empty() {
         return format!(
             "Source: {}\nQuery:  {}\nTotal:  {}\n\n(no results)\n",
             response.source, response.query, response.total
         );
     }
 
-    let ncols = rows.iter().map(Vec::len).max().unwrap_or(0);
+    // Try structured table_row() first, fall back to JSON keys.
+    let (headers, rows) = build_table_data(response, compact, strip_sw);
+
+    let ncols = headers.len();
     let mut widths = vec![0usize; ncols];
+
+    // Account for header widths.
+    for (i, h) in headers.iter().enumerate() {
+        widths[i] = widths[i].max(h.len());
+    }
+    // Account for row widths (already truncated).
     for row in &rows {
         for (i, cell) in row.iter().enumerate() {
-            widths[i] = widths[i].max(cell.len());
+            if i < ncols {
+                widths[i] = widths[i].max(cell.len());
+            }
         }
     }
 
@@ -178,15 +193,80 @@ fn render_table(response: &SearchResponse, compact: bool, strip_sw: bool) -> Str
         response.source, response.query, response.total
     );
 
+    // Header row
+    for (i, h) in headers.iter().enumerate() {
+        let w = widths[i];
+        let _ = write!(out, " {h:<w$} |");
+    }
+    out.push('\n');
+
+    // Separator row
+    for w in &widths {
+        let _ = write!(out, "-{:-<w$}-+", "", w = w);
+    }
+    out.push('\n');
+
+    // Data rows
     for row in &rows {
         for (i, cell) in row.iter().enumerate() {
-            let w = widths.get(i).copied().unwrap_or(cell.len());
-            let _ = write!(out, "{cell:<w$}  ");
+            let w = if i < ncols { widths[i] } else { cell.len() };
+            let _ = write!(out, " {cell:<w$} |");
         }
         out.push('\n');
     }
 
     out
+}
+
+fn build_table_data(
+    response: &SearchResponse,
+    compact: bool,
+    strip_sw: bool,
+) -> (Vec<String>, Vec<Vec<String>>) {
+    // Try the first result's table_row() to get structured headers.
+    if let Some(first) = response.results.first() {
+        if let Some((hdrs, _)) = first.table_row() {
+            let headers: Vec<String> = hdrs.into_iter().map(str::to_owned).collect();
+            let rows: Vec<Vec<String>> = response
+                .results
+                .iter()
+                .filter_map(|r| {
+                    r.table_row().map(|(_, vals)| {
+                        vals.into_iter()
+                            .map(|v| truncate(&post_process(v, compact, strip_sw), MAX_COL_WIDTH))
+                            .collect()
+                    })
+                })
+                .collect();
+            return (headers, rows);
+        }
+    }
+
+    // Fallback: use JSON keys as headers.
+    let mut headers: Vec<String> = Vec::new();
+    let mut rows: Vec<Vec<String>> = Vec::new();
+
+    for result in &response.results {
+        let v = result.to_json();
+        if let Some(obj) = v.as_object() {
+            if headers.is_empty() {
+                headers = obj.keys().cloned().collect();
+            }
+            let row: Vec<String> = obj
+                .values()
+                .map(|val| {
+                    let s = match val {
+                        serde_json::Value::String(s) => s.clone(),
+                        other => other.to_string(),
+                    };
+                    truncate(&post_process(s, compact, strip_sw), MAX_COL_WIDTH)
+                })
+                .collect();
+            rows.push(row);
+        }
+    }
+
+    (headers, rows)
 }
 
 // ---------------------------------------------------------------------------
@@ -202,6 +282,19 @@ pub fn write_output(content: &str, output_path: Option<&std::path::Path>) -> std
         }
         None => std::io::stdout().write_all(content.as_bytes()),
     }
+}
+
+// ---------------------------------------------------------------------------
+// Auto-detect format from file extension
+// ---------------------------------------------------------------------------
+
+/// Infer output format from file extension. Returns `None` if unknown.
+pub fn format_from_extension(path: &std::path::Path) -> Option<OutputFormat> {
+    path.extension().and_then(std::ffi::OsStr::to_str).and_then(|ext| match ext {
+        "json" => Some(OutputFormat::Json),
+        "md" => Some(OutputFormat::Markdown),
+        _ => None,
+    })
 }
 
 // ---------------------------------------------------------------------------

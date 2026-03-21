@@ -1,5 +1,8 @@
+use std::path::Path;
+
 use lawyerr::format::{
-    OutputFormat, Renderable, SearchResponse, parse_recent, render, write_output,
+    OutputFormat, Renderable, SearchResponse, format_from_extension, parse_recent, render,
+    write_output,
 };
 
 // -----------------------------------------------------------------------
@@ -136,4 +139,98 @@ fn write_output_to_file() {
     write_output("hello", Some(f.path())).unwrap();
     let content = std::fs::read_to_string(f.path()).unwrap();
     assert_eq!(content, "hello");
+}
+
+// -----------------------------------------------------------------------
+// format_from_extension
+// -----------------------------------------------------------------------
+
+#[test]
+fn format_from_extension_json() {
+    assert_eq!(format_from_extension(Path::new("out.json")), Some(OutputFormat::Json));
+}
+
+#[test]
+fn format_from_extension_md() {
+    assert_eq!(format_from_extension(Path::new("results.md")), Some(OutputFormat::Markdown));
+}
+
+#[test]
+fn format_from_extension_unknown() {
+    assert_eq!(format_from_extension(Path::new("results.txt")), None);
+}
+
+#[test]
+fn format_from_extension_no_ext() {
+    assert_eq!(format_from_extension(Path::new("results")), None);
+}
+
+// -----------------------------------------------------------------------
+// Table rendering with table_row()
+// -----------------------------------------------------------------------
+
+struct StructuredResult {
+    date: String,
+    processo: String,
+    relator: String,
+    descritores: String,
+}
+
+impl Renderable for StructuredResult {
+    fn to_markdown(&self) -> String {
+        format!("## {} - {}", self.processo, self.date)
+    }
+
+    fn to_json(&self) -> serde_json::Value {
+        serde_json::json!({
+            "date": self.date,
+            "processo": self.processo,
+        })
+    }
+
+    fn table_row(&self) -> Option<(Vec<&str>, Vec<String>)> {
+        Some((
+            vec!["Date", "Processo", "Relator", "Descritores"],
+            vec![
+                self.date.clone(),
+                self.processo.clone(),
+                self.relator.clone(),
+                self.descritores.clone(),
+            ],
+        ))
+    }
+}
+
+#[test]
+fn render_table_with_structured_headers() {
+    let response = SearchResponse {
+        source: "STJ".to_owned(),
+        query: "contrato".to_owned(),
+        total: 1,
+        results: vec![Box::new(StructuredResult {
+            date: "2024-01-15".to_owned(),
+            processo: "123/20".to_owned(),
+            relator: "Silva".to_owned(),
+            descritores: "Contrato, Nulidade".to_owned(),
+        })],
+    };
+    let out = render(&response, &OutputFormat::Table, false, false);
+    assert!(out.contains("Date"), "should have Date header");
+    assert!(out.contains("Processo"), "should have Processo header");
+    assert!(out.contains("Relator"), "should have Relator header");
+    assert!(out.contains("Descritores"), "should have Descritores header");
+    assert!(out.contains("123/20"), "should have processo value");
+    assert!(out.contains("---"), "should have separator row");
+}
+
+#[test]
+fn render_table_empty_results() {
+    let response = SearchResponse {
+        source: "STJ".to_owned(),
+        query: "nada".to_owned(),
+        total: 0,
+        results: vec![],
+    };
+    let out = render(&response, &OutputFormat::Table, false, false);
+    assert!(out.contains("(no results)"));
 }

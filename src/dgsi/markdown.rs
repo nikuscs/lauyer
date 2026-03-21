@@ -38,6 +38,17 @@ impl Renderable for DgsiSearchResult {
             "url": self.doc_url,
         })
     }
+
+    fn table_row(&self) -> Option<(Vec<&str>, Vec<String>)> {
+        let headers = vec!["Date", "Processo", "Relator", "Descritores"];
+        let values = vec![
+            self.date.to_string(),
+            self.processo.clone(),
+            self.relator.clone(),
+            self.descriptors.join(", "),
+        ];
+        Some((headers, values))
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -111,6 +122,17 @@ impl Renderable for DgsiDecision {
         }
 
         serde_json::Value::Object(map)
+    }
+
+    fn table_row(&self) -> Option<(Vec<&str>, Vec<String>)> {
+        let headers = vec!["Date", "Processo", "Relator", "Descritores"];
+        let values = vec![
+            format_date(self.data_acordao),
+            self.processo.clone(),
+            self.relator.clone(),
+            self.descritores.join(", "),
+        ];
+        Some((headers, values))
     }
 }
 

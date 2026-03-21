@@ -5,11 +5,12 @@ use std::sync::Arc;
 use anyhow::Context as _;
 use clap::Parser as _;
 use futures::stream::{FuturesUnordered, StreamExt as _};
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use lawyerr::format::Renderable;
 use lawyerr::{cli, config, dgsi, dr, format, http, server};
 
 #[tokio::main]
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines, clippy::literal_string_with_formatting_args)]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -24,7 +25,13 @@ async fn main() -> anyhow::Result<()> {
     let compact = !cli.no_compact;
     let strip_sw = cli.strip_stopwords;
     let output_path = cli.output.as_deref();
-    let fmt = &cli.format;
+    let quiet = cli.quiet;
+
+    // Resolve output format: explicit --format wins; otherwise infer from
+    // --output extension; otherwise fall back to markdown.
+    let fmt = cli
+        .format
+        .unwrap_or_else(|| output_path.and_then(format::format_from_extension).unwrap_or_default());
 
     match cli.command {
         cli::Commands::Dgsi { command } => match command {
@@ -67,6 +74,27 @@ async fn main() -> anyhow::Result<()> {
                 let sort_by_date = args.sort == "date";
                 let max_concurrent = args.max_concurrent.unwrap_or(3);
 
+                // --- Progress: set up per-court spinners ---
+                let mp = MultiProgress::new();
+                let spinner_style = ProgressStyle::with_template("{prefix} {spinner} {msg}")
+                    .unwrap_or_else(|_| ProgressStyle::default_spinner());
+
+                let court_spinners: Vec<ProgressBar> = if quiet {
+                    Vec::new()
+                } else {
+                    courts
+                        .iter()
+                        .map(|c| {
+                            let pb = mp.add(ProgressBar::new_spinner());
+                            pb.set_style(spinner_style.clone());
+                            pb.set_prefix(format!("[{}]", c.alias()));
+                            pb.set_message("Searching...");
+                            pb.enable_steady_tick(std::time::Duration::from_millis(100));
+                            pb
+                        })
+                        .collect()
+                };
+
                 let court_results = dgsi::search_all_courts(
                     fetcher.as_ref(),
                     &courts,
@@ -77,6 +105,31 @@ async fn main() -> anyhow::Result<()> {
                 )
                 .await;
 
+                // --- Progress: update spinners with results ---
+                if !quiet {
+                    for (court, result) in &court_results {
+                        if let Some(pb) = court_spinners
+                            .iter()
+                            .find(|pb| pb.prefix() == format!("[{}]", court.alias()))
+                        {
+                            match result {
+                                Ok((total, _)) => {
+                                    pb.finish_with_message(format!("done, {total} results"));
+                                }
+                                Err(e) => {
+                                    let msg = e.to_string();
+                                    let short = if msg.contains("timeout") {
+                                        "timeout".to_owned()
+                                    } else {
+                                        truncate_msg(&msg, 60)
+                                    };
+                                    pb.finish_with_message(format!("error: {short}"));
+                                }
+                            }
+                        }
+                    }
+                }
+
                 let mut full_output = String::new();
 
                 for (court, result) in court_results {
@@ -86,6 +139,21 @@ async fn main() -> anyhow::Result<()> {
                         }
                         Ok((total, results)) => {
                             if args.fetch_full && !results.is_empty() {
+                                // --- Progress: fetch-full progress bar ---
+                                let fetch_pb = if quiet {
+                                    None
+                                } else {
+                                    let pb = mp.add(ProgressBar::new(results.len() as u64));
+                                    pb.set_style(
+                                        ProgressStyle::with_template(
+                                            "[{bar:30}] {pos}/{len} Fetching decisions...",
+                                        )
+                                        .unwrap_or_else(|_| ProgressStyle::default_bar()),
+                                    );
+                                    pb.set_prefix(format!("[{}]", court.alias()));
+                                    Some(pb)
+                                };
+
                                 let sem = Arc::new(tokio::sync::Semaphore::new(max_concurrent));
                                 let mut tasks: FuturesUnordered<_> = results
                                     .iter()
@@ -110,12 +178,19 @@ async fn main() -> anyhow::Result<()> {
 
                                 let mut full_renderables: Vec<Box<dyn Renderable>> = Vec::new();
                                 while let Some(dec_result) = tasks.next().await {
+                                    if let Some(ref pb) = fetch_pb {
+                                        pb.inc(1);
+                                    }
                                     match dec_result {
                                         Ok(dec) => full_renderables.push(Box::new(dec)),
                                         Err(e) => {
                                             tracing::warn!(error = %e, "Failed to fetch decision");
                                         }
                                     }
+                                }
+
+                                if let Some(pb) = fetch_pb {
+                                    pb.finish_and_clear();
                                 }
 
                                 let response = format::SearchResponse {
@@ -125,7 +200,7 @@ async fn main() -> anyhow::Result<()> {
                                     results: full_renderables,
                                 };
                                 full_output
-                                    .push_str(&format::render(&response, fmt, compact, strip_sw));
+                                    .push_str(&format::render(&response, &fmt, compact, strip_sw));
                             } else {
                                 let renderables: Vec<Box<dyn Renderable>> = results
                                     .into_iter()
@@ -138,7 +213,7 @@ async fn main() -> anyhow::Result<()> {
                                     results: renderables,
                                 };
                                 full_output
-                                    .push_str(&format::render(&response, fmt, compact, strip_sw));
+                                    .push_str(&format::render(&response, &fmt, compact, strip_sw));
                             }
                         }
                     }
@@ -155,14 +230,32 @@ async fn main() -> anyhow::Result<()> {
                 )
                 .context("Failed to build HTTP client")?;
 
+                let pb = if quiet {
+                    None
+                } else {
+                    let pb = ProgressBar::new_spinner();
+                    pb.set_style(
+                        ProgressStyle::with_template("{spinner} {msg}")
+                            .unwrap_or_else(|_| ProgressStyle::default_spinner()),
+                    );
+                    pb.set_message("Fetching decision...");
+                    pb.enable_steady_tick(std::time::Duration::from_millis(100));
+                    Some(pb)
+                };
+
                 let decision = dgsi::fetch_full_decision(&fetcher, &url).await?;
+
+                if let Some(pb) = pb {
+                    pb.finish_and_clear();
+                }
+
                 let response = format::SearchResponse {
                     source: "DGSI".to_owned(),
                     query: url.clone(),
                     total: 1,
                     results: vec![Box::new(decision) as Box<dyn Renderable>],
                 };
-                let rendered = format::render(&response, fmt, compact, strip_sw);
+                let rendered = format::render(&response, &fmt, compact, strip_sw);
                 format::write_output(&rendered, output_path)?;
             }
 
@@ -178,7 +271,25 @@ async fn main() -> anyhow::Result<()> {
 
         cli::Commands::Dr { command } => match command {
             cli::DrCommands::Search(_args) => {
+                let pb = if quiet {
+                    None
+                } else {
+                    let pb = ProgressBar::new_spinner();
+                    pb.set_style(
+                        ProgressStyle::with_template("{spinner} {msg}")
+                            .unwrap_or_else(|_| ProgressStyle::default_spinner()),
+                    );
+                    pb.set_message("Searching DR...");
+                    pb.enable_steady_tick(std::time::Duration::from_millis(100));
+                    Some(pb)
+                };
+
                 let _results = dr::search().await?;
+
+                if let Some(pb) = pb {
+                    pb.finish_and_clear();
+                }
+
                 tracing::info!("dr search: not fully implemented yet");
             }
             cli::DrCommands::Fetch { url: _ } => {
@@ -193,9 +304,32 @@ async fn main() -> anyhow::Result<()> {
         },
 
         cli::Commands::Serve(args) => {
-            server::start(&args.host, args.port).await.context("Server failed")?;
+            let http_client = http::HttpClient::new(
+                cli.proxy.as_deref().or(cfg.http.proxy.as_deref()),
+                cfg.http.timeout_secs,
+                cfg.http.retries,
+            )
+            .context("Failed to build HTTP client")?;
+
+            server::start(&args.host, args.port, cfg, http_client)
+                .await
+                .context("Server failed")?;
         }
     }
 
     Ok(())
+}
+
+fn truncate_msg(s: &str, max: usize) -> String {
+    if s.len() <= max {
+        s.to_owned()
+    } else {
+        let mut end = max.saturating_sub(3);
+        while end > 0 && !s.is_char_boundary(end) {
+            end -= 1;
+        }
+        let mut t = s[..end].to_owned();
+        t.push_str("...");
+        t
+    }
 }

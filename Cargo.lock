@@ -1199,6 +1199,7 @@ dependencies = [
  "tokio",
  "tokio-test",
  "toml",
+ "tower",
  "tracing",
  "tracing-subscriber",
  "uuid",
