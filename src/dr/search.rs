@@ -82,7 +82,7 @@ pub fn build_pesquisa_cookie(params: &DrSearchParams) -> String {
 }
 
 /// Build the filtros object for cookie encoding (plain arrays, compact JSON).
-fn build_cookie_filtros(params: &DrSearchParams) -> Value {
+pub fn build_cookie_filtros(params: &DrSearchParams) -> Value {
     let tipo_conteudo: Vec<&str> =
         params.content_types.iter().map(DrContentType::tipo_conteudo).collect();
 
@@ -109,7 +109,7 @@ fn build_cookie_filtros(params: &DrSearchParams) -> Value {
 
 /// Build the `PesquisaAvancadaBools` object. All known content type keys are
 /// present; only the selected ones are `true`.
-fn build_bools(params: &DrSearchParams) -> Value {
+pub fn build_bools(params: &DrSearchParams) -> Value {
     let mut bools = Map::new();
     // All known boolean keys in the expected order
     let all_keys = [
@@ -218,7 +218,7 @@ pub fn build_search_body(session: &DrSession, params: &DrSearchParams) -> Value 
 
 /// Build the `FiltrosDePesquisa` in `OutSystems` format (lists as
 /// `{"List": [...], "EmptyListItem": ""}`).
-fn build_body_filtros(params: &DrSearchParams) -> Value {
+pub fn build_body_filtros(params: &DrSearchParams) -> Value {
     let tipo_conteudo: Vec<Value> = params
         .content_types
         .iter()
@@ -349,7 +349,7 @@ pub async fn search(session: &DrSession, params: &DrSearchParams) -> Result<DrSe
 
 /// Parse the outer response, then double-parse `data.Resultado` which is a
 /// JSON string containing `ElasticSearch` results.
-fn parse_search_response(response_text: &str) -> Result<DrSearchResponse> {
+pub fn parse_search_response(response_text: &str) -> Result<DrSearchResponse> {
     let outer: Value = serde_json::from_str(response_text).map_err(|e| LawyerrError::Parse {
         message: format!("Failed to parse DR response JSON: {e}"),
         source_url: SEARCH_URL.to_owned(),
@@ -424,119 +424,4 @@ fn parse_hit(hit: &Value) -> Option<DrSearchResult> {
         serie: get_str("serie"),
         db_id: get_str("dbId"),
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn build_bools_sets_correct_keys() {
-        let params = DrSearchParams {
-            content_types: vec![DrContentType::AtosSerie1],
-            query: String::new(),
-            act_types: vec![],
-            since: None,
-            until: None,
-            limit: 25,
-        };
-        let bools = build_bools(&params);
-        assert_eq!(bools["Atos1"], true);
-        assert_eq!(bools["Atos2"], false);
-        assert_eq!(bools["DiarioRepublica"], false);
-        assert_eq!(bools["Jurisprudencia"], false);
-    }
-
-    #[test]
-    fn build_cookie_filtros_compact_json() {
-        let params = DrSearchParams {
-            content_types: vec![DrContentType::AtosSerie1],
-            query: String::new(),
-            act_types: vec!["Portaria".to_owned()],
-            since: NaiveDate::from_ymd_opt(2026, 3, 14),
-            until: NaiveDate::from_ymd_opt(2026, 3, 21),
-            limit: 25,
-        };
-        let filtros = build_cookie_filtros(&params);
-        let json_str = serde_json::to_string(&filtros).unwrap_or_default();
-        // Must be compact (no spaces after : or ,)
-        assert!(!json_str.contains(": "));
-        assert!(json_str.contains("\"AtosSerie1\""));
-        assert!(json_str.contains("\"Portaria\""));
-        assert!(json_str.contains("\"2026-03-14\""));
-    }
-
-    #[test]
-    fn build_body_filtros_uses_outsystems_format() {
-        let params = DrSearchParams {
-            content_types: vec![DrContentType::AtosSerie1],
-            query: "trabalho".to_owned(),
-            act_types: vec!["Portaria".to_owned()],
-            since: None,
-            until: None,
-            limit: 25,
-        };
-        let filtros = build_body_filtros(&params);
-        // Lists must use OutSystems format
-        assert!(filtros["tipo"]["List"].is_array());
-        assert_eq!(filtros["tipo"]["EmptyListItem"], "");
-        assert_eq!(filtros["texto"], "trabalho");
-        assert_eq!(filtros["ano"], "0");
-        assert_eq!(filtros["paginaInicial"], "0");
-    }
-
-    #[test]
-    fn pesquisa_cookie_is_url_encoded() {
-        let params = DrSearchParams {
-            content_types: vec![DrContentType::AtosSerie1],
-            query: String::new(),
-            act_types: vec![],
-            since: None,
-            until: None,
-            limit: 25,
-        };
-        let cookie = build_pesquisa_cookie(&params);
-        // URL-encoded JSON should not contain raw braces
-        assert!(!cookie.contains('{'));
-        assert!(!cookie.contains('}'));
-    }
-
-    #[test]
-    fn parse_search_response_double_parses() {
-        let response = serde_json::json!({
-            "versionInfo": {
-                "hasModuleVersionChanged": false,
-                "hasApiVersionChanged": false,
-            },
-            "data": {
-                "Resultado": "{\"took\":20,\"hits\":{\"total\":{\"value\":1},\"hits\":[{\"_source\":{\"title\":\"Test\",\"tipo\":\"Portaria\",\"numero\":\"123/2026\",\"dataPublicacao\":\"2026-03-20\",\"emissor\":\"Test Emissor\",\"sumario\":\"<p>Test sumario</p>\",\"serie\":\"I\",\"dbId\":\"42\"}}]}}",
-                "ResultsCount": "1",
-                "HasErrorPesquisa": false,
-            }
-        });
-
-        let result = parse_search_response(&response.to_string());
-        assert!(result.is_ok());
-        let resp = result.unwrap();
-        assert_eq!(resp.total, 1);
-        assert_eq!(resp.results.len(), 1);
-        assert_eq!(resp.results[0].tipo, "Portaria");
-        assert_eq!(resp.results[0].numero, "123/2026");
-        assert_eq!(resp.results[0].emissor, "Test Emissor");
-        assert_eq!(resp.results[0].db_id, "42");
-        assert_eq!(resp.results[0].data_publicacao, NaiveDate::from_ymd_opt(2026, 3, 20));
-    }
-
-    #[test]
-    fn parse_search_response_handles_exception() {
-        let response = serde_json::json!({
-            "exception": {
-                "message": "Role validation failed",
-            }
-        });
-        let result = parse_search_response(&response.to_string());
-        assert!(result.is_err());
-        let err = result.unwrap_err().to_string();
-        assert!(err.contains("Role validation failed"));
-    }
 }

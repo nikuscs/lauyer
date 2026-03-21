@@ -1,0 +1,14 @@
+{
+  "versionInfo": {
+    "hasModuleVersionChanged": false,
+    "hasApiVersionChanged": false
+  },
+  "data": {
+    "Resultado": "{\"took\":15,\"timed_out\":false,\"_shards\":{\"total\":5,\"successful\":5,\"skipped\":0,\"failed\":0},\"hits\":{\"total\":{\"value\":3,\"relation\":\"eq\"},\"max_score\":null,\"hits\":[{\"_index\":\"dr\",\"_id\":\"1\",\"_score\":null,\"_source\":{\"title\":\"Portaria n.º 122/2026/1 - Diário da República n.º 56/2026, Série I de 2026-03-20\",\"tipo\":\"Portaria\",\"numero\":\"122/2026/1\",\"dataPublicacao\":\"2026-03-20\",\"emissor\":\"Economia e Coesão Territorial\",\"sumario\":\"Reconhece a <b>Associação Empresarial</b> de Águeda (AEA/ACOAG) como câmara de comércio e indústria.\",\"serie\":\"I\",\"dbId\":\"abc123\",\"fileId\":\"file1\",\"tipoConteudo\":\"AtosSerie1\",\"ano\":2026,\"serieNR\":1,\"suplemento\":0,\"className\":\"DiplomaLegis\"}},{\"_index\":\"dr\",\"_id\":\"2\",\"_score\":null,\"_source\":{\"title\":\"Portaria n.º 123/2026/1 - Diário da República n.º 56/2026, Série I de 2026-03-20\",\"tipo\":\"Portaria\",\"numero\":\"123/2026/1\",\"dataPublicacao\":\"2026-03-20\",\"emissor\":\"Saúde\",\"sumario\":\"Estabelece o modelo de funcionamento e organização do <em>Programa Nacional</em> de Promoção da Saúde Oral (PNPSO).\",\"serie\":\"I\",\"dbId\":\"def456\",\"fileId\":\"file2\",\"tipoConteudo\":\"AtosSerie1\",\"ano\":2026,\"serieNR\":1,\"suplemento\":0,\"className\":\"DiplomaLegis\"}},{\"_index\":\"dr\",\"_id\":\"3\",\"_score\":null,\"_source\":{\"title\":\"Decreto-Lei n.º 15/2026 - Diário da República n.º 54/2026, Série I de 2026-03-18\",\"tipo\":\"Decreto-Lei\",\"numero\":\"15/2026\",\"dataPublicacao\":\"2026-03-18\",\"emissor\":\"Presidência do Conselho de Ministros\",\"sumario\":\"Altera o regime jurídico do arrendamento urbano.\",\"serie\":\"I\",\"dbId\":\"ghi789\",\"fileId\":\"file3\",\"tipoConteudo\":\"AtosSerie1\",\"ano\":2026,\"serieNR\":1,\"suplemento\":0,\"className\":\"DiplomaLegis\"}}]},\"aggregations\":{\"TipoAtoAgg\":{\"buckets\":[{\"key\":\"Portaria\",\"doc_count\":2},{\"key\":\"Decreto-Lei\",\"doc_count\":1}]},\"EmissorAgg\":{\"buckets\":[{\"key\":\"Economia e Coesão Territorial\",\"doc_count\":1},{\"key\":\"Saúde\",\"doc_count\":1},{\"key\":\"Presidência do Conselho de Ministros\",\"doc_count\":1}]}}}",
+    "ResultsCount": "3",
+    "HasErrorPesquisa": false,
+    "DestaquesExcertos2": false,
+    "Data_DeValid": true,
+    "Data_AteValid": true
+  }
+}

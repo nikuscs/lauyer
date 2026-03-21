@@ -457,3 +457,226 @@ async fn dgsi_search_markdown_alias() {
         "Expected 200 or 502, got: {status}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// DR handler tests
+// ---------------------------------------------------------------------------
+
+// DR session init contacts diariodarepublica.pt. If the host is unreachable,
+// `DrSession::new` returns `LawyerrError::Http` → `StatusCode::BAD_GATEWAY`
+// (502). If reachable, the search runs and returns 200. Both outcomes are
+// valid in these tests — what matters is that valid params never return 400.
+
+#[tokio::test]
+async fn dr_search_with_params() {
+    let app = test_router();
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/dr/search?q=test&type=portaria&content=atos-1&limit=5")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    // Parameters are valid — must NOT get a 400. If DR is reachable → 200;
+    // if not → 502 or 500.
+    let status = response.status();
+    assert_ne!(status, StatusCode::BAD_REQUEST, "Valid params must not return 400, got: {status}");
+    assert!(
+        status == StatusCode::OK
+            || status == StatusCode::BAD_GATEWAY
+            || status == StatusCode::INTERNAL_SERVER_ERROR,
+        "Unexpected status for dr_search_with_params: {status}"
+    );
+}
+
+#[tokio::test]
+async fn dr_search_with_dates() {
+    let app = test_router();
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/dr/search?since=2024-01-01&until=2025-01-01")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    // Valid date params — must NOT get a 400.
+    let status = response.status();
+    assert_ne!(status, StatusCode::BAD_REQUEST, "Valid dates must not return 400, got: {status}");
+    assert!(
+        status == StatusCode::OK
+            || status == StatusCode::BAD_GATEWAY
+            || status == StatusCode::INTERNAL_SERVER_ERROR,
+        "Unexpected status for dr_search_with_dates: {status}"
+    );
+}
+
+#[tokio::test]
+async fn dr_search_invalid_date() {
+    let app = test_router();
+
+    let response = app
+        .oneshot(Request::builder().uri("/dr/search?since=not-a-date").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+
+    // The DR handler creates the session before parsing dates, so the network
+    // failure occurs first and we get 502. The important invariant is that the
+    // server does not return 200 (it must not succeed with bad input).
+    let status = response.status();
+    assert_ne!(status, StatusCode::OK, "Server must not return 200 for invalid date input");
+}
+
+#[tokio::test]
+async fn dr_search_invalid_content_type() {
+    let app = test_router();
+
+    let response = app
+        .oneshot(
+            Request::builder().uri("/dr/search?content=invalid-type").body(Body::empty()).unwrap(),
+        )
+        .await
+        .unwrap();
+
+    // Session init happens before content-type resolution, so we get a network
+    // error (502) rather than a user-input error (400). Either way, not 200.
+    let status = response.status();
+    assert_ne!(status, StatusCode::OK, "Server must not return 200 for invalid content type");
+}
+
+#[tokio::test]
+async fn dr_today_endpoint() {
+    let app = test_router();
+
+    let response = app
+        .oneshot(Request::builder().uri("/dr/today").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+
+    // DR session init may or may not reach the upstream host.
+    let status = response.status();
+    assert!(
+        status == StatusCode::OK
+            || status == StatusCode::BAD_GATEWAY
+            || status == StatusCode::INTERNAL_SERVER_ERROR,
+        "Unexpected status for dr_today_endpoint: {status}"
+    );
+}
+
+#[tokio::test]
+async fn dr_today_with_type() {
+    let app = test_router();
+
+    let response = app
+        .oneshot(Request::builder().uri("/dr/today?type=portaria").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+
+    // DR session init may or may not reach the upstream host.
+    let status = response.status();
+    assert!(
+        status == StatusCode::OK
+            || status == StatusCode::BAD_GATEWAY
+            || status == StatusCode::INTERNAL_SERVER_ERROR,
+        "Unexpected status for dr_today_with_type: {status}"
+    );
+}
+
+#[tokio::test]
+async fn dr_types_json() {
+    let app = test_router();
+
+    let response = app
+        .oneshot(Request::builder().uri("/dr/types?format=json").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert!(json.is_array(), "Expected JSON array of act types, got: {json}");
+
+    let arr = json.as_array().unwrap();
+    assert!(!arr.is_empty(), "Act types array must not be empty");
+
+    for entry in arr {
+        assert!(entry.get("alias").is_some(), "Each entry must have an 'alias' field");
+        assert!(entry.get("name").is_some(), "Each entry must have a 'name' field");
+    }
+}
+
+#[tokio::test]
+async fn dr_types_markdown() {
+    let app = test_router();
+
+    let response = app
+        .oneshot(Request::builder().uri("/dr/types").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let content_type = response
+        .headers()
+        .get(axum::http::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    assert!(
+        content_type.starts_with("text/markdown"),
+        "Expected text/markdown content-type, got: {content_type}"
+    );
+
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body_str = std::str::from_utf8(&body).unwrap();
+    assert!(
+        body_str.contains("| Alias |"),
+        "Markdown table must contain '| Alias |' header: {body_str}"
+    );
+    assert!(
+        body_str.contains("| Act Type |"),
+        "Markdown table must contain '| Act Type |' header: {body_str}"
+    );
+}
+
+#[tokio::test]
+async fn dr_fetch_still_501() {
+    let app = test_router();
+
+    let response = app
+        .oneshot(Request::builder().uri("/dr/fetch").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::NOT_IMPLEMENTED);
+
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert!(json.get("error").is_some(), "501 response must include an 'error' field: {json}");
+}
+
+#[tokio::test]
+async fn dr_search_markdown_format() {
+    let app = test_router();
+
+    let response = app
+        .oneshot(Request::builder().uri("/dr/search?q=test&format=md").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+
+    // DR session init may or may not reach the upstream host.
+    let status = response.status();
+    assert!(
+        status == StatusCode::OK
+            || status == StatusCode::BAD_GATEWAY
+            || status == StatusCode::INTERNAL_SERVER_ERROR,
+        "Unexpected status for dr_search_markdown_format: {status}"
+    );
+}

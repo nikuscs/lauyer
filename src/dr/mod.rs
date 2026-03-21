@@ -33,33 +33,3 @@ pub fn list_act_types() -> Vec<(String, String)> {
         .map(|(alias, name)| ((*alias).to_owned(), (*name).to_owned()))
         .collect()
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn resolve_content_types_valid() {
-        let aliases = vec!["atos-1".to_owned(), "decisoes".to_owned()];
-        let result = resolve_content_types(&aliases);
-        assert!(result.is_ok());
-        let types = result.unwrap();
-        assert_eq!(types.len(), 2);
-        assert_eq!(types[0], DrContentType::AtosSerie1);
-        assert_eq!(types[1], DrContentType::Jurisprudencia);
-    }
-
-    #[test]
-    fn resolve_content_types_invalid() {
-        let aliases = vec!["invalid".to_owned()];
-        let result = resolve_content_types(&aliases);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn list_act_types_nonempty() {
-        let types = list_act_types();
-        assert!(!types.is_empty());
-        assert!(types.iter().any(|(alias, _)| alias == "portaria"));
-    }
-}

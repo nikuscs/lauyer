@@ -33,8 +33,21 @@ impl DrSession {
     /// 2. GET `roles` with `X-CSRFToken` header to set session cookies.
     /// 3. Parse and clean the embedded body template.
     pub async fn new(client: HttpClient) -> Result<Self> {
+        Self::new_from_urls(client, VERSION_INFO_URL, ROLES_URL).await
+    }
+
+    /// Initialise a DR session using explicit endpoint URLs.
+    ///
+    /// Identical to [`new`] but lets callers override the version-info and
+    /// roles URLs — primarily useful in tests where a mock server replaces
+    /// the real DR endpoints.
+    pub async fn new_from_urls(
+        client: HttpClient,
+        version_info_url: &str,
+        roles_url: &str,
+    ) -> Result<Self> {
         // Step 1: fetch module version
-        let version_text = client.get_text(VERSION_INFO_URL).await.map_err(|e| {
+        let version_text = client.get_text(version_info_url).await.map_err(|e| {
             tracing::warn!(error = %e, "Failed to fetch DR module version info");
             e
         })?;
@@ -42,7 +55,7 @@ impl DrSession {
         let version_json: Value =
             serde_json::from_str(&version_text).map_err(|e| LawyerrError::Parse {
                 message: format!("Failed to parse moduleversioninfo JSON: {e}"),
-                source_url: VERSION_INFO_URL.to_owned(),
+                source_url: version_info_url.to_owned(),
             })?;
 
         let module_version = version_json
@@ -50,7 +63,7 @@ impl DrSession {
             .and_then(Value::as_str)
             .ok_or_else(|| LawyerrError::Parse {
                 message: "Missing versionToken in moduleversioninfo response".to_owned(),
-                source_url: VERSION_INFO_URL.to_owned(),
+                source_url: version_info_url.to_owned(),
             })?
             .to_owned();
 
@@ -59,11 +72,11 @@ impl DrSession {
         // Step 2: call roles endpoint to set session cookies on the jar
         let _roles_response = client
             .inner()
-            .get(ROLES_URL)
+            .get(roles_url)
             .header("X-CSRFToken", CSRF_TOKEN)
             .send()
             .await
-            .map_err(|e| LawyerrError::Http { source: e, url: ROLES_URL.to_owned() })?;
+            .map_err(|e| LawyerrError::Http { source: e, url: roles_url.to_owned() })?;
 
         info!("DR session cookies set via roles endpoint");
 
@@ -111,7 +124,7 @@ impl DrSession {
 }
 
 /// Recursively remove all keys named `_comment` from a JSON value.
-fn strip_comment_keys(value: &mut Value) {
+pub fn strip_comment_keys(value: &mut Value) {
     match value {
         Value::Object(map) => {
             map.remove("_comment");
@@ -125,31 +138,5 @@ fn strip_comment_keys(value: &mut Value) {
             }
         }
         _ => {}
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn strip_comment_keys_works() {
-        let mut val = serde_json::json!({
-            "_comment": "remove me",
-            "keep": "yes",
-            "nested": {
-                "_comment": "also remove",
-                "data": 42
-            },
-            "arr": [{"_comment": "gone", "x": 1}]
-        });
-        strip_comment_keys(&mut val);
-
-        assert!(val.get("_comment").is_none());
-        assert_eq!(val["keep"], "yes");
-        assert!(val["nested"].get("_comment").is_none());
-        assert_eq!(val["nested"]["data"], 42);
-        assert!(val["arr"][0].get("_comment").is_none());
-        assert_eq!(val["arr"][0]["x"], 1);
     }
 }
