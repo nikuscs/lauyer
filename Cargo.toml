@@ -22,7 +22,7 @@ futures = "0.3"
 reqwest = { version = "0.12", features = ["gzip", "brotli", "socks", "json", "cookies"] }
 
 # HTML parsing
-scraper = "0.25"
+scraper = "0.26"
 
 # HTML → Markdown
 htmd = "0.1"
