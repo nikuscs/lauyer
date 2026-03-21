@@ -12,3 +12,5 @@ config.toml
 tarpaulin-report.*
 lcov.info
 cobertura.xml
+docs/reports/
+docs/plans/
