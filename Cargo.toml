@@ -19,13 +19,13 @@ tokio = { version = "1", features = ["full"] }
 futures = "0.3"
 
 # HTTP
-reqwest = { version = "0.12", features = ["gzip", "brotli", "socks", "json", "cookies"] }
+reqwest = { version = "0.13", features = ["gzip", "brotli", "socks", "json", "cookies"] }
 
 # HTML parsing
-scraper = "0.25"
+scraper = "0.26"
 
 # HTML → Markdown
-htmd = "0.1"
+htmd = "0.5"
 
 # Encoding
 encoding_rs = "0.8"
@@ -33,7 +33,7 @@ encoding_rs = "0.8"
 # Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-toml = "0.8"
+toml = "1"
 
 # URL percent-encoding (for DGSI search queries)
 percent-encoding = "2"
@@ -56,7 +56,7 @@ thiserror = "2"
 chrono = { version = "0.4", features = ["serde"] }
 
 # Progress bars
-indicatif = "0.17"
+indicatif = "0.18"
 
 # UUID generation (for DR session)
 uuid = { version = "1", features = ["v4"] }
