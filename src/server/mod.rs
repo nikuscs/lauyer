@@ -221,8 +221,9 @@ async fn dr_stub() -> (StatusCode, Json<ErrorBody>) {
 
 fn parse_output_format(fmt: Option<&str>) -> OutputFormat {
     match fmt {
-        Some("md" | "markdown") => OutputFormat::Markdown,
-        _ => OutputFormat::Json,
+        Some("json") => OutputFormat::Json,
+        Some("table") => OutputFormat::Table,
+        _ => OutputFormat::Markdown,
     }
 }
 
