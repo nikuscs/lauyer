@@ -2,9 +2,9 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use tower::ServiceExt as _;
 
-use lawyerr::config::Config;
-use lawyerr::http::HttpClient;
-use lawyerr::server;
+use lauyer::config::Config;
+use lauyer::http::HttpClient;
+use lauyer::server;
 
 fn test_router() -> axum::Router {
     let config = Config::default();
@@ -463,7 +463,7 @@ async fn dgsi_search_markdown_alias() {
 // ---------------------------------------------------------------------------
 
 // DR session init contacts diariodarepublica.pt. If the host is unreachable,
-// `DrSession::new` returns `LawyerrError::Http` → `StatusCode::BAD_GATEWAY`
+// `DrSession::new` returns `LauyerError::Http` → `StatusCode::BAD_GATEWAY`
 // (502). If reachable, the search runs and returns 200. Both outcomes are
 // valid in these tests — what matters is that valid params never return 400.
 
@@ -679,4 +679,157 @@ async fn dr_search_markdown_format() {
             || status == StatusCode::INTERNAL_SERVER_ERROR,
         "Unexpected status for dr_search_markdown_format: {status}"
     );
+}
+
+// ---------------------------------------------------------------------------
+// DR handler coverage for additional branches
+// ---------------------------------------------------------------------------
+
+// content=atos-2&type=despacho — exercises the non-default content alias path
+// and act type resolution inside dr_search. The upstream DR session will fail
+// (network unreachable) but all query-param parsing runs before the network call.
+#[tokio::test]
+async fn dr_search_with_content_param() {
+    let app = test_router();
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/dr/search?content=atos-2&type=despacho")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    // Session init hits the real DR network which may be unreachable → 502.
+    // Valid params must not return 400.
+    let status = response.status();
+    assert_ne!(status, StatusCode::BAD_REQUEST, "valid content/type must not return 400");
+}
+
+/// No content param → handler defaults to "atos-1". Verify no 400 is returned.
+#[tokio::test]
+async fn dr_search_default_content() {
+    let app = test_router();
+
+    let response = app
+        .oneshot(Request::builder().uri("/dr/search?q=test").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+
+    let status = response.status();
+    assert_ne!(status, StatusCode::BAD_REQUEST, "default content must not return 400");
+    assert!(
+        status == StatusCode::OK
+            || status == StatusCode::BAD_GATEWAY
+            || status == StatusCode::INTERNAL_SERVER_ERROR,
+        "Unexpected status for dr_search_default_content: {status}"
+    );
+}
+
+// dr/today with type=portaria — exercises act type resolution inside dr_today
+#[tokio::test]
+async fn dr_today_with_type_filter() {
+    let app = test_router();
+
+    let response = app
+        .oneshot(Request::builder().uri("/dr/today?type=portaria").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+
+    let status = response.status();
+    assert_ne!(status, StatusCode::BAD_REQUEST, "valid type param must not return 400");
+    assert!(
+        status == StatusCode::OK
+            || status == StatusCode::BAD_GATEWAY
+            || status == StatusCode::INTERNAL_SERVER_ERROR,
+        "Unexpected status for dr_today_with_type_filter: {status}"
+    );
+}
+
+/// dr/types JSON structure — every entry has alias and name string fields
+#[tokio::test]
+async fn dr_types_json_structure() {
+    let app = test_router();
+
+    let response = app
+        .oneshot(Request::builder().uri("/dr/types?format=json").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    let arr = json.as_array().expect("dr/types must return a JSON array");
+    assert!(!arr.is_empty(), "act types must not be empty");
+
+    for entry in arr {
+        let alias = entry["alias"].as_str();
+        let name = entry["name"].as_str();
+        assert!(alias.is_some(), "each entry must have a string 'alias'");
+        assert!(name.is_some(), "each entry must have a string 'name'");
+        assert!(!alias.unwrap().is_empty(), "alias must not be empty");
+        assert!(!name.unwrap().is_empty(), "name must not be empty");
+    }
+}
+
+// dr/today with unknown alias — session init fires first (502); server must not return 200.
+#[tokio::test]
+async fn dr_today_with_invalid_type() {
+    let app = test_router();
+
+    let response = app
+        .oneshot(
+            Request::builder().uri("/dr/today?type=not-a-real-type").body(Body::empty()).unwrap(),
+        )
+        .await
+        .unwrap();
+
+    let status = response.status();
+    assert_ne!(status, StatusCode::OK, "invalid type param must not return 200");
+}
+
+/// dr/search with unknown act type alias → server must not return 200
+#[tokio::test]
+async fn dr_search_unknown_act_type() {
+    let app = test_router();
+
+    let response = app
+        .oneshot(
+            Request::builder().uri("/dr/search?type=not-a-real-type").body(Body::empty()).unwrap(),
+        )
+        .await
+        .unwrap();
+
+    let status = response.status();
+    assert_ne!(status, StatusCode::OK, "unknown act type must not return 200");
+}
+
+// AppError session variant → 503 SERVICE_UNAVAILABLE
+#[tokio::test]
+async fn app_error_session_variant_is_503() {
+    use axum::response::IntoResponse as _;
+    use lauyer::error::LauyerError;
+    use lauyer::server::AppError;
+
+    let err = AppError::from(LauyerError::Session { message: "no session".to_owned() });
+    let response = err.into_response();
+    assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+}
+
+// AppError parse variant → 500 INTERNAL_SERVER_ERROR
+#[tokio::test]
+async fn app_error_parse_variant_is_500() {
+    use axum::response::IntoResponse as _;
+    use lauyer::error::LauyerError;
+    use lauyer::server::AppError;
+
+    let err = AppError::from(LauyerError::Parse {
+        message: "bad parse".to_owned(),
+        source_url: "http://example.com".to_owned(),
+    });
+    let response = err.into_response();
+    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
 }

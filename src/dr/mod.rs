@@ -7,7 +7,7 @@ pub use content_types::{DrContentType, resolve_act_type};
 pub use search::{DrAggregations, DrSearchParams, DrSearchResponse, DrSearchResult, search};
 pub use session::DrSession;
 
-use crate::error::{LawyerrError, Result};
+use crate::error::{LauyerError, Result};
 
 /// Resolve a list of CLI alias strings into `DrContentType` values.
 ///
@@ -16,7 +16,7 @@ pub fn resolve_content_types(aliases: &[String]) -> Result<Vec<DrContentType>> {
     aliases
         .iter()
         .map(|alias| {
-            DrContentType::from_alias(alias).ok_or_else(|| LawyerrError::UserInput {
+            DrContentType::from_alias(alias).ok_or_else(|| LauyerError::UserInput {
                 message: format!(
                     "Unknown DR content type alias: '{alias}'. \
                      Valid aliases: atos-1, atos-2, dr, decisoes"

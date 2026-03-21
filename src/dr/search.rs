@@ -4,7 +4,7 @@ use reqwest::Url;
 use serde_json::{Map, Value, json};
 use tracing::{info, warn};
 
-use crate::error::{LawyerrError, Result};
+use crate::error::{LauyerError, Result};
 
 use super::content_types::DrContentType;
 use super::session::DrSession;
@@ -307,7 +307,7 @@ const SEARCH_URL: &str = "https://diariodarepublica.pt/dr/screenservices/dr/Pesq
 pub async fn search(session: &DrSession, params: &DrSearchParams) -> Result<DrSearchResponse> {
     let url: Url = DrSession::base_url()
         .parse()
-        .map_err(|_| LawyerrError::Session { message: "Invalid base URL".to_owned() })?;
+        .map_err(|_| LauyerError::Session { message: "Invalid base URL".to_owned() })?;
 
     // Set cookies
     let cookie_value = build_pesquisa_cookie(params);
@@ -341,17 +341,17 @@ pub async fn search(session: &DrSession, params: &DrSearchParams) -> Result<DrSe
         .json(&body)
         .send()
         .await
-        .map_err(|e| LawyerrError::Http { source: e, url: SEARCH_URL.to_owned() })?;
+        .map_err(|e| LauyerError::Http { source: e, url: SEARCH_URL.to_owned() })?;
 
     let status = response.status();
     if !status.is_success() {
-        return Err(LawyerrError::Session { message: format!("DR search returned HTTP {status}") });
+        return Err(LauyerError::Session { message: format!("DR search returned HTTP {status}") });
     }
 
     let response_text = response
         .text()
         .await
-        .map_err(|e| LawyerrError::Http { source: e, url: SEARCH_URL.to_owned() })?;
+        .map_err(|e| LauyerError::Http { source: e, url: SEARCH_URL.to_owned() })?;
 
     parse_search_response(&response_text)
 }
@@ -363,7 +363,7 @@ pub async fn search(session: &DrSession, params: &DrSearchParams) -> Result<DrSe
 /// Parse the outer response, then double-parse `data.Resultado` which is a
 /// JSON string containing `ElasticSearch` results.
 pub fn parse_search_response(response_text: &str) -> Result<DrSearchResponse> {
-    let outer: Value = serde_json::from_str(response_text).map_err(|e| LawyerrError::Parse {
+    let outer: Value = serde_json::from_str(response_text).map_err(|e| LauyerError::Parse {
         message: format!("Failed to parse DR response JSON: {e}"),
         source_url: SEARCH_URL.to_owned(),
     })?;
@@ -371,7 +371,7 @@ pub fn parse_search_response(response_text: &str) -> Result<DrSearchResponse> {
     // Check for exception
     if let Some(exception) = outer.get("exception") {
         let msg = exception.get("message").and_then(Value::as_str).unwrap_or("Unknown exception");
-        return Err(LawyerrError::Session { message: format!("DR API exception: {msg}") });
+        return Err(LauyerError::Session { message: format!("DR API exception: {msg}") });
     }
 
     // Check for API version change
@@ -383,7 +383,7 @@ pub fn parse_search_response(response_text: &str) -> Result<DrSearchResponse> {
         }
     }
 
-    let data = outer.get("data").ok_or_else(|| LawyerrError::Parse {
+    let data = outer.get("data").ok_or_else(|| LauyerError::Parse {
         message: "Missing 'data' field in DR response".to_owned(),
         source_url: SEARCH_URL.to_owned(),
     })?;
@@ -399,7 +399,7 @@ pub fn parse_search_response(response_text: &str) -> Result<DrSearchResponse> {
     let resultado_str = data.get("Resultado").and_then(Value::as_str).unwrap_or("{}");
 
     let es_results: Value =
-        serde_json::from_str(resultado_str).map_err(|e| LawyerrError::Parse {
+        serde_json::from_str(resultado_str).map_err(|e| LauyerError::Parse {
             message: format!("Failed to double-parse data.Resultado: {e}"),
             source_url: SEARCH_URL.to_owned(),
         })?;

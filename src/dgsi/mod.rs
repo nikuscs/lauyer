@@ -9,7 +9,7 @@ use courts::Court;
 use decision::{DgsiDecision, parse_decision};
 use search::{DgsiSearchResult, parse_search_results};
 
-use crate::error::{LawyerrError, Result};
+use crate::error::{LauyerError, Result};
 use crate::http::HttpFetcher;
 
 // Re-export for use from main.rs / tests
@@ -69,7 +69,7 @@ pub async fn search_court(
         let html = fetcher.get_text(&url).await?;
 
         let (page_total, page_results) = parse_search_results(&html, court.db())
-            .map_err(|e| LawyerrError::Parse { message: e.to_string(), source_url: url.clone() })?;
+            .map_err(|e| LauyerError::Parse { message: e.to_string(), source_url: url.clone() })?;
 
         total_found = page_total;
         let page_len = page_results.len() as u32;
@@ -129,7 +129,7 @@ pub async fn fetch_full_decision(fetcher: &dyn HttpFetcher, url: &str) -> Result
     let bytes = fetcher.get(url).await?;
     let html = decode_latin1(&bytes);
     parse_decision(&html, url)
-        .map_err(|e| LawyerrError::Parse { message: e.to_string(), source_url: url.to_owned() })
+        .map_err(|e| LauyerError::Parse { message: e.to_string(), source_url: url.to_owned() })
 }
 
 /// Resolve a list of court aliases to `Court` values.
@@ -141,7 +141,7 @@ pub fn resolve_courts(aliases: &[String]) -> Result<Vec<Court>> {
     aliases
         .iter()
         .map(|alias| {
-            Court::from_alias(alias).ok_or_else(|| LawyerrError::Config {
+            Court::from_alias(alias).ok_or_else(|| LauyerError::Config {
                 message: format!("Unknown court alias: '{alias}'"),
             })
         })

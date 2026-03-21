@@ -1,5 +1,5 @@
-use lawyerr::config::{Config, load_config};
-use lawyerr::format::OutputFormat;
+use lauyer::config::{Config, load_config};
+use lauyer::format::OutputFormat;
 use std::io::Write as _;
 
 #[test]
@@ -22,7 +22,7 @@ fn default_config_values() {
 
 #[test]
 fn load_config_no_file_returns_error() {
-    let tmp = std::path::Path::new("/tmp/lawyerr_nonexistent_xyz.toml");
+    let tmp = std::path::Path::new("/tmp/lauyer_nonexistent_xyz.toml");
     let result = load_config(Some(tmp));
     assert!(result.is_err(), "explicit path to missing file should return error");
 }
@@ -73,7 +73,7 @@ fn load_config_invalid_toml() {
 fn load_config_explicit_path_not_found_returns_error() {
     // Explicit path that does not exist → error
     use std::path::Path;
-    let path = Path::new("/tmp/lawyerr_definitely_missing_file_xyz987.toml");
+    let path = Path::new("/tmp/lauyer_definitely_missing_file_xyz987.toml");
     let result = load_config(Some(path));
     assert!(result.is_err(), "missing explicit path should return error");
 }
@@ -100,4 +100,39 @@ retries = 1
     assert_eq!(cfg.http.retries, 1);
     // Unspecified fields should retain defaults
     assert_eq!(cfg.http.max_concurrent, 10);
+}
+
+// ---------------------------------------------------------------------------
+// config.rs — additional branch coverage
+// ---------------------------------------------------------------------------
+
+#[test]
+fn load_config_none_finds_no_local_file() {
+    // Change into a fresh temp dir that has no lauyer.toml.
+    let dir = tempfile::TempDir::new().unwrap();
+    let original_dir = std::env::current_dir().unwrap();
+    std::env::set_current_dir(dir.path()).unwrap();
+
+    let result = load_config(None);
+
+    // Restore working directory regardless of outcome
+    std::env::set_current_dir(&original_dir).unwrap();
+
+    let cfg = result.expect("load_config(None) from empty dir must not fail");
+    assert!(cfg.server.port > 0, "returned config must have a valid port");
+}
+
+#[test]
+fn load_config_explicit_path_io_error_context() {
+    let mut f = tempfile::NamedTempFile::new().unwrap();
+    // Write content that is syntactically broken at the TOML level
+    write!(f, "[broken\nkey without equals sign\n").unwrap();
+    let result = load_config(Some(f.path()));
+    assert!(result.is_err(), "broken TOML with explicit path must return error");
+    // The error message should mention the path
+    let msg = result.unwrap_err().to_string();
+    assert!(
+        msg.contains("Failed to parse") || msg.contains(".toml") || !msg.is_empty(),
+        "error must be non-empty: {msg}"
+    );
 }

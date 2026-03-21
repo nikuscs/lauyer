@@ -4,7 +4,7 @@ use std::time::Duration;
 use encoding_rs::WINDOWS_1252;
 use tracing::{info, warn};
 
-use crate::error::{LawyerrError, Result};
+use crate::error::{LauyerError, Result};
 
 // ---------------------------------------------------------------------------
 // Trait
@@ -39,21 +39,19 @@ impl HttpClient {
         let mut builder = reqwest::Client::builder()
             .cookie_provider(Arc::clone(&cookie_jar))
             .timeout(Duration::from_secs(timeout_secs))
-            .user_agent(
-                "Mozilla/5.0 (compatible; lawyerr/0.1; +https://github.com/nikuscs/lawyerr)",
-            )
+            .user_agent("Mozilla/5.0 (compatible; lauyer/0.1; +https://github.com/nikuscs/lauyer)")
             .gzip(true)
             .brotli(true);
 
         if let Some(proxy_url) = proxy {
             let proxy = reqwest::Proxy::all(proxy_url)
-                .map_err(|e| LawyerrError::Http { source: e, url: proxy_url.to_owned() })?;
+                .map_err(|e| LauyerError::Http { source: e, url: proxy_url.to_owned() })?;
             builder = builder.proxy(proxy);
         }
 
         let client = builder
             .build()
-            .map_err(|e| LawyerrError::Http { source: e, url: "<client build>".to_owned() })?;
+            .map_err(|e| LauyerError::Http { source: e, url: "<client build>".to_owned() })?;
 
         Ok(Self { client, cookie_jar, retries })
     }
@@ -84,7 +82,7 @@ impl HttpClient {
         url: &str,
         build: impl Fn() -> reqwest::RequestBuilder,
     ) -> Result<reqwest::Response> {
-        let mut last_err: Option<LawyerrError> = None;
+        let mut last_err: Option<LauyerError> = None;
 
         for attempt in 0..=self.retries {
             if attempt > 0 {
@@ -103,13 +101,13 @@ impl HttpClient {
                     }
                     if is_retryable_status(status) && attempt < self.retries {
                         warn!(attempt, %status, "Retryable HTTP status");
-                        last_err = Some(LawyerrError::Http {
+                        last_err = Some(LauyerError::Http {
                             source: resp.error_for_status().unwrap_err(),
                             url: url.to_owned(),
                         });
                         continue;
                     }
-                    return resp.error_for_status().map_err(|e| LawyerrError::Http {
+                    return resp.error_for_status().map_err(|e| LauyerError::Http {
                         url: e.url().map_or_else(|| "<unknown>".to_owned(), ToString::to_string),
                         source: e,
                     });
@@ -117,7 +115,7 @@ impl HttpClient {
                 Err(e) => {
                     if is_retryable_error(&e) && attempt < self.retries {
                         warn!(attempt, error = %e, "Retryable request error");
-                        last_err = Some(LawyerrError::Http {
+                        last_err = Some(LauyerError::Http {
                             url: e
                                 .url()
                                 .map_or_else(|| "<unknown>".to_owned(), ToString::to_string),
@@ -125,7 +123,7 @@ impl HttpClient {
                         });
                         continue;
                     }
-                    return Err(LawyerrError::Http {
+                    return Err(LauyerError::Http {
                         url: e.url().map_or_else(|| "<unknown>".to_owned(), ToString::to_string),
                         source: e,
                     });
@@ -133,7 +131,7 @@ impl HttpClient {
             }
         }
 
-        Err(last_err.unwrap_or_else(|| LawyerrError::Session {
+        Err(last_err.unwrap_or_else(|| LauyerError::Session {
             message: "Retry loop exhausted with no error recorded".to_owned(),
         }))
     }
@@ -151,13 +149,13 @@ impl HttpFetcher for HttpClient {
         resp.bytes()
             .await
             .map(|b| b.to_vec())
-            .map_err(|e| LawyerrError::Http { url: url.to_owned(), source: e })
+            .map_err(|e| LauyerError::Http { url: url.to_owned(), source: e })
     }
 
     async fn get_text(&self, url: &str) -> Result<String> {
         let owned_url = url.to_owned();
         let resp = self.execute_with_retry(url, || self.client.get(&owned_url)).await?;
-        resp.text().await.map_err(|e| LawyerrError::Http { url: url.to_owned(), source: e })
+        resp.text().await.map_err(|e| LauyerError::Http { url: url.to_owned(), source: e })
     }
 
     async fn post_json(
@@ -180,7 +178,7 @@ impl HttpFetcher for HttpClient {
             })
             .await?;
 
-        resp.text().await.map_err(|e| LawyerrError::Http { url: url.to_owned(), source: e })
+        resp.text().await.map_err(|e| LauyerError::Http { url: url.to_owned(), source: e })
     }
 }
 

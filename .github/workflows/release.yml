@@ -23,7 +23,7 @@ permissions: {}
 env:
   CARGO_TERM_COLOR: always
   RUSTFLAGS: -Dwarnings
-  BINARY_NAME: lawyerr
+  BINARY_NAME: lauyer
 
 jobs:
   checks:
@@ -128,10 +128,13 @@ jobs:
         include:
           - os: macos-latest
             target: aarch64-apple-darwin
-            artifact: lawyerr-macos-arm64
+            artifact: lauyer-macos-arm64
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            artifact: lawyerr-linux-x64
+            artifact: lauyer-linux-x64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact: lauyer-windows-x64
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -153,15 +156,24 @@ jobs:
         run: cargo build --release --target ${{ matrix.target }}
 
       - name: Package (Unix)
+        if: runner.os != 'Windows'
         run: |
           cd target/${{ matrix.target }}/release
           tar -czvf ../../../${{ matrix.artifact }}.tar.gz ${{ env.BINARY_NAME }}
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}.exe" -DestinationPath "${{ matrix.artifact }}.zip"
 
       - name: Upload artifact
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: ${{ matrix.artifact }}
-          path: ${{ matrix.artifact }}.tar.gz
+          path: |
+            ${{ matrix.artifact }}.tar.gz
+            ${{ matrix.artifact }}.zip
 
   publish:
     name: Create Release
@@ -223,20 +235,30 @@ jobs:
 
             | Platform | File |
             |----------|------|
-            | macOS (Apple Silicon) | `lawyerr-macos-arm64.tar.gz` |
-            | Linux (x64) | `lawyerr-linux-x64.tar.gz` |
+            | macOS (Apple Silicon) | `lauyer-macos-arm64.tar.gz` |
+            | Linux (x64) | `lauyer-linux-x64.tar.gz` |
+            | Windows (x64) | `lauyer-windows-x64.zip` |
 
             ### Quick Install
 
             ```bash
             # Linux/macOS
-            tar -xzf lawyerr-*.tar.gz
-            chmod +x lawyerr
-            ./lawyerr --help
+            tar -xzf lauyer-*.tar.gz
+            chmod +x lauyer
+            sudo mv lauyer /usr/local/bin/
+            lauyer --help
+            ```
+
+            ```powershell
+            # Windows
+            Expand-Archive lauyer-windows-x64.zip -DestinationPath .
+            .\lauyer.exe --help
             ```
 
             ${{ steps.changelog.outputs.changelog }}
-          files: artifacts/**/*.tar.gz
+          files: |
+            artifacts/**/*.tar.gz
+            artifacts/**/*.zip
           draft: false
           prerelease: false
 

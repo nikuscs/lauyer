@@ -129,9 +129,9 @@ pub struct Config {
 // Config loading
 // ---------------------------------------------------------------------------
 
-/// Return the user-level config path (`~/.config/lawyerr/lawyerr.toml`).
+/// Return the user-level config path (`~/.config/lauyer/lauyer.toml`).
 fn user_config_path() -> Option<PathBuf> {
-    dirs_home().map(|h| h.join(".config").join("lawyerr").join("lawyerr.toml"))
+    dirs_home().map(|h| h.join(".config").join("lauyer").join("lauyer.toml"))
 }
 
 /// Minimal home-dir detection without pulling in the `dirs` crate.
@@ -157,8 +157,8 @@ fn try_load(path: &Path) -> anyhow::Result<Option<Config>> {
 ///
 /// Resolution order:
 /// 1. `path` (if supplied) -- errors are fatal for explicit paths
-/// 2. `./lawyerr.toml`
-/// 3. `~/.config/lawyerr/lawyerr.toml`
+/// 2. `./lauyer.toml`
+/// 3. `~/.config/lauyer/lauyer.toml`
 /// 4. Compiled-in defaults
 pub fn load_config(path: Option<&Path>) -> anyhow::Result<Config> {
     if let Some(explicit) = path {
@@ -176,7 +176,7 @@ pub fn load_config(path: Option<&Path>) -> anyhow::Result<Config> {
         }
     }
 
-    let local = Path::new("lawyerr.toml");
+    let local = Path::new("lauyer.toml");
     match try_load(local) {
         Ok(Some(cfg)) => {
             tracing::info!(path = %local.display(), "Loaded config");

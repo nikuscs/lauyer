@@ -1,11 +1,11 @@
 [package]
-name = "lawyerr"
+name = "lauyer"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
 description = "Fast CLI for searching Portuguese legal jurisprudence (DGSI) and legislation (Diário da República)"
 license = "MIT"
-repository = "https://github.com/nikuscs/lawyerr"
+repository = "https://github.com/nikuscs/lauyer"
 readme = "README.md"
 keywords = ["legal", "portugal", "cli", "dgsi", "rust"]
 categories = ["command-line-utilities"]

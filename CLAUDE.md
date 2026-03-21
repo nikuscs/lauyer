@@ -1,4 +1,4 @@
-# lawyerr
+# lauyer
 
 Fast Rust CLI for searching Portuguese legal information from two sources:
 
@@ -18,8 +18,8 @@ src/
 ├── lib.rs           # Public module exports
 ├── main.rs          # Entry point, tokio runtime, tracing, CLI dispatch
 ├── cli.rs           # Clap derive CLI (dgsi/dr/serve subcommands)
-├── config.rs        # TOML config loading (./lawyerr.toml → ~/.config/lawyerr/ → defaults)
-├── error.rs         # LawyerrError enum (thiserror)
+├── config.rs        # TOML config loading (./lauyer.toml → ~/.config/lauyer/ → defaults)
+├── error.rs         # LauyerError enum (thiserror)
 ├── http.rs          # HttpClient + HttpFetcher trait, retry with backoff, Latin-1 decoding
 ├── format.rs        # OutputFormat, Renderable trait, render pipeline, DateRange, parse_recent
 ├── compact.rs       # compact_text (whitespace/HTML/boilerplate), strip_stopwords (Portuguese)

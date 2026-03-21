@@ -1,6 +1,6 @@
 # Phase 2: DGSI Module
 
-**Goal:** Implement the full DGSI search and parsing pipeline. After this phase, `lawyerr dgsi search "usucapião"` should return real results as markdown/JSON.
+**Goal:** Implement the full DGSI search and parsing pipeline. After this phase, `lauyer dgsi search "usucapião"` should return real results as markdown/JSON.
 
 **Depends on:** Phase 1 (core infrastructure)
 
@@ -126,9 +126,9 @@
 - [ ] Implement `--fetch-full` mode: for each search result, fetch full decision in parallel
 
 ### Wire Up CLI
-- [ ] Connect `lawyerr dgsi search` command to search pipeline
-- [ ] Connect `lawyerr dgsi fetch` command to decision fetcher
-- [ ] Connect `lawyerr dgsi courts` command to list all courts with aliases
+- [ ] Connect `lauyer dgsi search` command to search pipeline
+- [ ] Connect `lauyer dgsi fetch` command to decision fetcher
+- [ ] Connect `lauyer dgsi courts` command to list all courts with aliases
 - [ ] Progress bars via `indicatif` for multi-court search and `--fetch-full`
 
 ### Unit Tests
@@ -152,13 +152,13 @@
 - [ ] Test multi-court parallel search
 
 ### Verification (manual)
-- [ ] `lawyerr dgsi courts` — lists all 10 courts with aliases
-- [ ] `lawyerr dgsi search "usucapião" --court stj --limit 5` — returns 5 results from STJ
-- [ ] `lawyerr dgsi search "usucapião" --court stj --format json` — valid JSON output
-- [ ] `lawyerr dgsi search "usucapião" --court stj --since 2020-01-01` — date filtering works
-- [ ] `lawyerr dgsi search "usucapião"` (no court) — searches all courts in parallel
-- [ ] `lawyerr dgsi fetch <url>` — fetches and renders a full decision as markdown
-- [ ] `lawyerr dgsi search "usucapião" --court stj --fetch-full --limit 3` — fetches full text for 3 results
+- [ ] `lauyer dgsi courts` — lists all 10 courts with aliases
+- [ ] `lauyer dgsi search "usucapião" --court stj --limit 5` — returns 5 results from STJ
+- [ ] `lauyer dgsi search "usucapião" --court stj --format json` — valid JSON output
+- [ ] `lauyer dgsi search "usucapião" --court stj --since 2020-01-01` — date filtering works
+- [ ] `lauyer dgsi search "usucapião"` (no court) — searches all courts in parallel
+- [ ] `lauyer dgsi fetch <url>` — fetches and renders a full decision as markdown
+- [ ] `lauyer dgsi search "usucapião" --court stj --fetch-full --limit 3` — fetches full text for 3 results
 - [ ] Verify Portuguese characters render correctly (ã, ç, õ, é, etc.)
 
 ---

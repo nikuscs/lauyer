@@ -1,4 +1,4 @@
-use lawyerr::http::{HttpClient, HttpFetcher as _};
+use lauyer::http::{HttpClient, HttpFetcher as _};
 use serde_json::json;
 use wiremock::matchers::{body_json, header, header_exists, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -414,4 +414,50 @@ async fn get_text_on_502_gateway() {
     let result = client.get_text(&url).await;
 
     assert!(result.is_err(), "502 with no retries should return an error");
+}
+
+// ---------------------------------------------------------------------------
+// retry_connection_refused — server dropped → connection error Err branch
+// with retries=1 so is_retryable_error fires for attempt 0, then falls through
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn test_retry_connection_refused() {
+    // Acquire a free port by binding a mock server then immediately dropping it.
+    let dead_uri = {
+        let server = MockServer::start().await;
+        server.uri()
+    };
+    // retries=1: attempt 0 fails with connection error (is_connect → retryable),
+    // stores last_err, attempt 1 also fails (attempt==retries → not retryable),
+    // returns Err immediately from the Err(e) branch at lines 128-131.
+    let client = HttpClient::new(None, 5, 1).unwrap();
+    let url = format!("{dead_uri}/any");
+    let result = client.get(&url).await;
+    assert!(result.is_err(), "connection refused with retry should ultimately return error");
+}
+
+// ---------------------------------------------------------------------------
+// retry_exhausted_via_connection_error — all retries consume last_err path
+// (lines 136-137: last_err.unwrap_or_else fallback never triggered here but
+// the last_err Some branch IS reached when retries>0 and connection fails)
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn test_retry_exhausted_via_503() {
+    // 503 is retryable. With retries=2, three total attempts all return 503.
+    // After the loop exhausts, last_err is Some → unwrap_or_else branch at
+    // line 136 returns the stored error (not the fallback).
+    let server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path("/always-503"))
+        .respond_with(ResponseTemplate::new(503))
+        .mount(&server)
+        .await;
+
+    let client = HttpClient::new(None, 30, 2).unwrap();
+    let url = format!("{}/always-503", server.uri());
+    let result = client.get_text(&url).await;
+    assert!(result.is_err(), "exhausted retries on 503 must return error");
 }

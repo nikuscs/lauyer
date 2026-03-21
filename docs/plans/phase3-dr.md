@@ -1,6 +1,6 @@
 # Phase 3: DR (Diário da República) Module
 
-**Goal:** Implement the full DR search pipeline via OutSystems screen services. After this phase, `lawyerr dr search --type portaria --recent 1w` should return real Portarias as markdown/JSON.
+**Goal:** Implement the full DR search pipeline via OutSystems screen services. After this phase, `lauyer dr search --type portaria --recent 1w` should return real Portarias as markdown/JSON.
 
 **Depends on:** Phase 1 (core infrastructure)
 
@@ -160,17 +160,17 @@
 - [ ] Apply compact mode if enabled
 
 ### Wire Up CLI
-- [ ] Connect `lawyerr dr search` command:
+- [ ] Connect `lauyer dr search` command:
   - `--content` flag → `DrContentType` (default: `atos-1`)
   - `--type` flag → act type filter (repeatable)
   - `--since` / `--until` / `--recent` → date range
   - Query text → `texto` field
-- [ ] Connect `lawyerr dr today` command:
+- [ ] Connect `lauyer dr today` command:
   - Sets `since` and `until` to today
   - Optional `--type` filter
-- [ ] Connect `lawyerr dr types` command:
+- [ ] Connect `lauyer dr types` command:
   - Runs a search with no filters, extracts `TipoAtoAgg` buckets, displays available types with counts
-- [ ] Connect `lawyerr dr fetch` command (if individual document fetching is needed)
+- [ ] Connect `lauyer dr fetch` command (if individual document fetching is needed)
 
 ### Unit Tests
 - [ ] Test `DrContentType::tipo_conteudo()` — returns correct PascalCase values
@@ -195,14 +195,14 @@
 - [ ] Test live text search with `texto` field
 
 ### Verification (manual)
-- [ ] `lawyerr dr search --content atos-1 --recent 1w` — returns individual acts from past week
-- [ ] `lawyerr dr search --content atos-1 --type portaria --recent 1w` — only Portarias
-- [ ] `lawyerr dr search "trabalho" --content atos-1 --recent 1m` — text search works
-- [ ] `lawyerr dr search --content atos-2 --recent 1w` — 2nd series results
-- [ ] `lawyerr dr search --content decisoes --recent 1m` — judicial decisions
-- [ ] `lawyerr dr today` — today's publications
-- [ ] `lawyerr dr types` — lists available act types
-- [ ] `lawyerr dr search --format json` — valid JSON output
+- [ ] `lauyer dr search --content atos-1 --recent 1w` — returns individual acts from past week
+- [ ] `lauyer dr search --content atos-1 --type portaria --recent 1w` — only Portarias
+- [ ] `lauyer dr search "trabalho" --content atos-1 --recent 1m` — text search works
+- [ ] `lauyer dr search --content atos-2 --recent 1w` — 2nd series results
+- [ ] `lauyer dr search --content decisoes --recent 1m` — judicial decisions
+- [ ] `lauyer dr today` — today's publications
+- [ ] `lauyer dr types` — lists available act types
+- [ ] `lauyer dr search --format json` — valid JSON output
 - [ ] Verify sumário HTML is stripped in markdown output
 - [ ] Verify session refresh works (run search, wait, run again)
 

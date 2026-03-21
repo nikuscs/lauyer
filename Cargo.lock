@@ -1175,7 +1175,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "lawyerr"
+name = "lauyer"
 version = "0.1.0"
 dependencies = [
  "anyhow",

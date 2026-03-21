@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
 use chrono::NaiveDate;
-use lawyerr::dgsi::courts::Court;
-use lawyerr::dgsi::decision::{DgsiDecision, parse_decision};
-use lawyerr::dgsi::search::{DgsiSearchResult, build_query, parse_search_results};
-use lawyerr::format::Renderable;
+use lauyer::dgsi::courts::Court;
+use lauyer::dgsi::decision::{DgsiDecision, parse_decision};
+use lauyer::dgsi::search::{DgsiSearchResult, build_query, parse_search_results};
+use lauyer::format::Renderable;
 
 // ---------------------------------------------------------------------------
 // Court helpers
@@ -196,13 +196,13 @@ fn court_list_all() {
 
 #[test]
 fn resolve_courts_empty() {
-    let courts = lawyerr::dgsi::resolve_courts(&[]).unwrap();
+    let courts = lauyer::dgsi::resolve_courts(&[]).unwrap();
     assert_eq!(courts.len(), 10, "Empty aliases should resolve to all 10 courts");
 }
 
 #[test]
 fn resolve_courts_unknown() {
-    let result = lawyerr::dgsi::resolve_courts(&["not-a-real-court".to_owned()]);
+    let result = lauyer::dgsi::resolve_courts(&["not-a-real-court".to_owned()]);
     assert!(result.is_err(), "Unknown alias should return an error");
 }
 
@@ -526,7 +526,7 @@ fn parse_search_results_descriptors_with_br_and_tags() {
 
 #[test]
 fn parse_decision_no_table() {
-    // HTML without the expected decision table → LawyerrError::Parse (lines 77-80)
+    // HTML without the expected decision table → LauyerError::Parse (lines 77-80)
     let html = r"<html><body><p>No table here</p></body></html>";
     let result = parse_decision(html, "https://example.com/test");
     assert!(result.is_err(), "missing decision table must return an error");
@@ -560,7 +560,7 @@ fn parse_decision_empty_date() {
 #[test]
 fn decision_format_date_none_via_markdown() {
     // format_date(None) is pub(super); exercise it indirectly via to_markdown() (line 272)
-    use lawyerr::format::Renderable as _;
+    use lauyer::format::Renderable as _;
     let mut d = make_decision();
     d.data_acordao = None;
     let md = d.to_markdown();
@@ -571,35 +571,115 @@ fn decision_format_date_none_via_markdown() {
 }
 
 // ---------------------------------------------------------------------------
-// LawyerrError From<reqwest::Error> (error.rs lines 35-40)
+// LauyerError From<reqwest::Error> (error.rs lines 35-40)
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
-async fn lawyerr_error_from_reqwest_error() {
-    use lawyerr::error::LawyerrError;
+async fn lauyer_error_from_reqwest_error() {
+    use lauyer::error::LauyerError;
 
     // Sending to an invalid scheme triggers a reqwest error without real network I/O.
     let client = reqwest::Client::new();
     let err = client.get("not://invalid-scheme/path").send().await.unwrap_err();
-    let lawyerr_err = LawyerrError::from(err);
-    let msg = lawyerr_err.to_string();
+    let lauyer_err = LauyerError::from(err);
+    let msg = lauyer_err.to_string();
     assert!(
         msg.contains("HTTP error"),
-        "LawyerrError::from(reqwest::Error) should produce an Http variant: {msg}"
+        "LauyerError::from(reqwest::Error) should produce an Http variant: {msg}"
     );
 }
 
 // ---------------------------------------------------------------------------
-// LawyerrError::UserInput display (error.rs)
+// LauyerError::UserInput display (error.rs)
 // ---------------------------------------------------------------------------
 
 #[test]
 fn user_input_error_display() {
-    let err = lawyerr::error::LawyerrError::UserInput { message: "bad date".to_owned() };
+    let err = lauyer::error::LauyerError::UserInput { message: "bad date".to_owned() };
     assert!(
         err.to_string().contains("bad date"),
         "UserInput display should contain the message, got: {err}"
     );
+}
+
+// ---------------------------------------------------------------------------
+// parse_search_results — additional branches for parse_total (search.rs)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn parse_search_results_no_h4() {
+    let html = r"<html><body><table></table></body></html>";
+    let (total, results) = parse_search_results(html, "test.nsf").unwrap();
+    assert_eq!(total, 0, "no h4 element should yield total=0");
+    assert!(results.is_empty());
+}
+
+/// h4 text is completely non-numeric (no leading digits) → parse error returned
+#[test]
+fn parse_search_results_unparseable_h4() {
+    let html = r"<html><body><h4>gibberish no numbers</h4><table></table></body></html>";
+    let result = parse_search_results(html, "test.nsf");
+    assert!(result.is_err(), "h4 with no leading number should return a parse error");
+    let err = result.unwrap_err().to_string();
+    assert!(
+        err.contains("parse") || err.contains("h4") || err.contains("total"),
+        "error should mention the parse failure: {err}"
+    );
+}
+
+/// h4 with semicolon but non-numeric "found" part → parse error from the semicolon branch
+#[test]
+fn parse_search_results_unparseable_found_part() {
+    let html = r"<html><body><h4>10 documents returned; unparseable found</h4></body></html>";
+    let result = parse_search_results(html, "test.nsf");
+    assert!(result.is_err(), "non-numeric found-count after semicolon should return error");
+}
+
+// ---------------------------------------------------------------------------
+// parse_decision — edge cases (decision.rs uncovered branches)
+// ---------------------------------------------------------------------------
+
+/// A <tr valign="top"> with only 1 <td> — skipped by the `cells.len() < 2` guard (line 84).
+#[test]
+fn parse_decision_single_cell_row() {
+    let html = r##"<html><body>
+<table width="100%" border="0">
+  <tr valign="top">
+    <td bgcolor="#71B2CF"><font color="#000080">OnlyCell:</font></td>
+  </tr>
+  <tr valign="top">
+    <td bgcolor="#71B2CF"><font color="#000080">Processo:</font></td>
+    <td bgcolor="#E0F1FF"><font color="#000080">12345</font></td>
+  </tr>
+</table>
+</body></html>"##;
+    let decision = parse_decision(html, "https://example.com/d").unwrap();
+    // Single-cell row is silently skipped; the two-cell Processo row is parsed.
+    assert_eq!(decision.processo, "12345");
+}
+
+/// A row where the label cell text is all whitespace → `label.is_empty()` guard (line 105-107).
+#[test]
+fn parse_decision_empty_label() {
+    let html = r##"<html><body>
+<table width="100%" border="0">
+  <tr valign="top">
+    <td bgcolor="#71B2CF"><font color="#000080">   </font></td>
+    <td bgcolor="#E0F1FF"><font color="#000080">SomeValue</font></td>
+  </tr>
+  <tr valign="top">
+    <td bgcolor="#71B2CF"><font color="#000080">Processo:</font></td>
+    <td bgcolor="#E0F1FF"><font color="#000080">67890</font></td>
+  </tr>
+</table>
+</body></html>"##;
+    let decision = parse_decision(html, "https://example.com/d").unwrap();
+    // The whitespace-label row is skipped; Processo is picked up correctly.
+    assert_eq!(decision.processo, "67890");
+    // "SomeValue" must NOT appear in any field (the empty-label row was dropped).
+    let json = decision.to_json();
+    let text = json.to_string();
+    assert!(!text.contains("SomeValue"), "empty-label row must be skipped: {text}");
 }
 
 // ---------------------------------------------------------------------------
@@ -609,10 +689,10 @@ fn user_input_error_display() {
 #[tokio::test]
 #[ignore = "requires network access to DGSI"]
 async fn live_dgsi_search_stj() {
-    let client = lawyerr::http::HttpClient::new(None, 30, 3).unwrap();
-    let (total, results) = lawyerr::dgsi::search_court(
+    let client = lauyer::http::HttpClient::new(None, 30, 3).unwrap();
+    let (total, results) = lauyer::dgsi::search_court(
         &client,
-        lawyerr::dgsi::courts::Court::Stj,
+        lauyer::dgsi::courts::Court::Stj,
         "usucapião",
         3,
         false,
@@ -627,8 +707,8 @@ async fn live_dgsi_search_stj() {
 #[tokio::test]
 #[ignore = "requires network access to DGSI"]
 async fn live_dgsi_fetch_decision() {
-    let client = lawyerr::http::HttpClient::new(None, 30, 3).unwrap();
-    let decision = lawyerr::dgsi::fetch_full_decision(
+    let client = lauyer::http::HttpClient::new(None, 30, 3).unwrap();
+    let decision = lauyer::dgsi::fetch_full_decision(
         &client,
         "https://www.dgsi.pt/jstj.nsf/954f0ce6ad9dd8b980256b5f003fa814/adbdc4fb2b666586802568fc003a8daf?OpenDocument",
     )
@@ -641,9 +721,9 @@ async fn live_dgsi_fetch_decision() {
 #[tokio::test]
 #[ignore = "requires network access to DGSI"]
 async fn live_dgsi_multi_court_search() {
-    let client = lawyerr::http::HttpClient::new(None, 30, 3).unwrap();
-    let courts = vec![lawyerr::dgsi::courts::Court::Stj, lawyerr::dgsi::courts::Court::RelPorto];
+    let client = lauyer::http::HttpClient::new(None, 30, 3).unwrap();
+    let courts = vec![lauyer::dgsi::courts::Court::Stj, lauyer::dgsi::courts::Court::RelPorto];
     let results =
-        lawyerr::dgsi::search_all_courts(&client, &courts, "contrato", 2, false, 2, None).await;
+        lauyer::dgsi::search_all_courts(&client, &courts, "contrato", 2, false, 2, None).await;
     assert_eq!(results.len(), 2);
 }

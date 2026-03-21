@@ -1,4 +1,4 @@
-# lawyerr — Initial Plan
+# lauyer — Initial Plan
 
 ## Overview
 
@@ -497,7 +497,7 @@ A complete reference body is saved at `docs/dr_request_template.json` for the im
 src/
 ├── main.rs
 ├── cli.rs                  # clap derive commands (subcommands per module)
-├── config.rs               # lawyerr.toml + env + CLI layering
+├── config.rs               # lauyer.toml + env + CLI layering
 ├── compact.rs              # Structural boilerplate removal (on by default)
 ├── format.rs               # Output: Markdown (default), JSON, Table
 ├── dgsi/
@@ -526,77 +526,77 @@ src/
 # ============ DGSI (Jurisprudência) ============
 
 # Search all courts in parallel (default when no --court specified)
-lawyerr dgsi search "usucapião"
+lauyer dgsi search "usucapião"
 
 # Search specific court(s)
-lawyerr dgsi search "contrato trabalho" --court stj --court rel-porto
+lauyer dgsi search "contrato trabalho" --court stj --court rel-porto
 
 # Date filtering — recent decisions
-lawyerr dgsi search "usucapião" --court stj --since 2024-01-01
-lawyerr dgsi search "usucapião" --court stj --recent 6m
+lauyer dgsi search "usucapião" --court stj --since 2024-01-01
+lauyer dgsi search "usucapião" --court stj --recent 6m
 
 # Limit and sort
-lawyerr dgsi search "usucapião" --limit 20 --sort date
+lauyer dgsi search "usucapião" --limit 20 --sort date
 
 # Field-specific search
-lawyerr dgsi search --field DESCRITORES --value "contrato" --court stj
+lauyer dgsi search --field DESCRITORES --value "contrato" --court stj
 
 # Fetch a specific decision → markdown
-lawyerr dgsi fetch <url-or-doc-id>
+lauyer dgsi fetch <url-or-doc-id>
 
 # List available courts
-lawyerr dgsi courts
+lauyer dgsi courts
 
 # ============ Diário da República ============
 
 # Search DR for portarias
-lawyerr dr search "portaria" --type portaria --since 2024-01-01
+lauyer dr search "portaria" --type portaria --since 2024-01-01
 
 # Search for recent decreto-leis
-lawyerr dr search "arrendamento" --type decreto-lei --recent 1y
+lauyer dr search "arrendamento" --type decreto-lei --recent 1y
 
 # Search by act type only (no text)
-lawyerr dr search --type portaria --since 2025-01-01
+lauyer dr search --type portaria --since 2025-01-01
 
 # Search in specific content types
-lawyerr dr search "trabalho" --content atos-1
+lauyer dr search "trabalho" --content atos-1
 
 # Fetch today's publications
-lawyerr dr today
-lawyerr dr today --type portaria
+lauyer dr today
+lauyer dr today --type portaria
 
 # Fetch a specific DR document
-lawyerr dr fetch <url-or-doc-id>
+lauyer dr fetch <url-or-doc-id>
 
 # List available act types
-lawyerr dr types
+lauyer dr types
 
 # ============ Shared flags ============
 
 # Proxy support (applies to both modules)
-lawyerr dgsi search "usucapião" --proxy socks5://host:port
+lauyer dgsi search "usucapião" --proxy socks5://host:port
 
 # Output format
-lawyerr dgsi search "usucapião" --format json
-lawyerr dr search "portaria" --format table
+lauyer dgsi search "usucapião" --format json
+lauyer dr search "portaria" --format table
 
 # Write output to file
-lawyerr dgsi search "usucapião" --output results.md
+lauyer dgsi search "usucapião" --output results.md
 
 # Compact mode (on by default, disable with flag)
-lawyerr dr search "portaria" --no-compact
+lauyer dr search "portaria" --no-compact
 
 # Stop word removal (opt-in)
-lawyerr dgsi search "usucapião" --strip-stopwords
+lauyer dgsi search "usucapião" --strip-stopwords
 
 # Fetch full text for all search results
-lawyerr dgsi search "usucapião" --fetch-full
+lauyer dgsi search "usucapião" --fetch-full
 
 # Control parallelism
-lawyerr dgsi search "usucapião" --max-concurrent 5
+lauyer dgsi search "usucapião" --max-concurrent 5
 
 # Start HTTP server
-lawyerr serve --port 3000 --host 0.0.0.0
+lauyer serve --port 3000 --host 0.0.0.0
 ```
 
 ### Defaults
@@ -649,7 +649,7 @@ Conservative Portuguese stop word list that preserves legal meaning:
 
 **Never removed (legal-critical):** `não`, `sem`, `nem`, `nunca`, `nenhum`, `nenhuma`, `jamais`, `salvo`, `excepto`, `apenas`, `somente`
 
-## Config File (`lawyerr.toml`)
+## Config File (`lauyer.toml`)
 
 ```toml
 # DGSI defaults
@@ -681,7 +681,7 @@ host = "0.0.0.0"
 port = 3000
 ```
 
-Config location search order: `./lawyerr.toml` → `~/.config/lawyerr/lawyerr.toml` → CLI flags override all.
+Config location search order: `./lauyer.toml` → `~/.config/lauyer/lauyer.toml` → CLI flags override all.
 
 ## Dependencies
 
@@ -758,7 +758,7 @@ uuid = { version = "1", features = ["v4"] }
 - For `--fetch-full`: progress bar showing fetched/total
 - Quiet mode: `--quiet` suppresses progress output (useful for piping)
 
-## HTTP Server Mode (`lawyerr serve`)
+## HTTP Server Mode (`lauyer serve`)
 
 Axum-based HTTP server wrapping both modules as REST endpoints.
 
@@ -790,9 +790,9 @@ RUN cargo build --release
 
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
-COPY --from=builder /app/target/release/lawyerr /usr/local/bin/
+COPY --from=builder /app/target/release/lauyer /usr/local/bin/
 EXPOSE 3000
-CMD ["lawyerr", "serve", "--port", "3000", "--host", "0.0.0.0"]
+CMD ["lauyer", "serve", "--port", "3000", "--host", "0.0.0.0"]
 ```
 
 ## Output Examples

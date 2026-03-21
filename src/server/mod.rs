@@ -8,7 +8,7 @@ use axum::routing::get;
 use serde::{Deserialize, Serialize};
 
 use crate::config::Config;
-use crate::error::LawyerrError;
+use crate::error::LauyerError;
 use crate::format::{OutputFormat, Renderable, SearchResponse};
 use crate::http::HttpClient;
 use crate::{dgsi, dr, format};
@@ -26,10 +26,10 @@ pub struct AppState {
 // Error wrapper
 // ---------------------------------------------------------------------------
 
-pub struct AppError(LawyerrError);
+pub struct AppError(LauyerError);
 
-impl From<LawyerrError> for AppError {
-    fn from(err: LawyerrError) -> Self {
+impl From<LauyerError> for AppError {
+    fn from(err: LauyerError) -> Self {
         Self(err)
     }
 }
@@ -37,13 +37,13 @@ impl From<LawyerrError> for AppError {
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let status = match &self.0 {
-            LawyerrError::Http { .. } => StatusCode::BAD_GATEWAY,
-            LawyerrError::Session { .. } => StatusCode::SERVICE_UNAVAILABLE,
-            LawyerrError::UserInput { .. } => StatusCode::BAD_REQUEST,
-            LawyerrError::Parse { .. }
-            | LawyerrError::Encoding { .. }
-            | LawyerrError::Config { .. }
-            | LawyerrError::Io { .. } => StatusCode::INTERNAL_SERVER_ERROR,
+            LauyerError::Http { .. } => StatusCode::BAD_GATEWAY,
+            LauyerError::Session { .. } => StatusCode::SERVICE_UNAVAILABLE,
+            LauyerError::UserInput { .. } => StatusCode::BAD_REQUEST,
+            LauyerError::Parse { .. }
+            | LauyerError::Encoding { .. }
+            | LauyerError::Config { .. }
+            | LauyerError::Io { .. } => StatusCode::INTERNAL_SERVER_ERROR,
         };
 
         let body = serde_json::json!({ "error": self.0.to_string() });
@@ -143,7 +143,7 @@ async fn dgsi_search(
         .since
         .as_deref()
         .map(|s| {
-            s.parse::<chrono::NaiveDate>().map_err(|_| LawyerrError::UserInput {
+            s.parse::<chrono::NaiveDate>().map_err(|_| LauyerError::UserInput {
                 message: format!("Invalid since date: '{s}'"),
             })
         })
@@ -153,7 +153,7 @@ async fn dgsi_search(
         .until
         .as_deref()
         .map(|s| {
-            s.parse::<chrono::NaiveDate>().map_err(|_| LawyerrError::UserInput {
+            s.parse::<chrono::NaiveDate>().map_err(|_| LauyerError::UserInput {
                 message: format!("Invalid until date: '{s}'"),
             })
         })
@@ -301,7 +301,7 @@ async fn dr_search(
     if let Some(ref type_str) = params.act_type {
         for alias in type_str.split(',').map(str::trim).filter(|s| !s.is_empty()) {
             let resolved = dr::resolve_act_type(alias).ok_or_else(|| {
-                AppError(LawyerrError::UserInput {
+                AppError(LauyerError::UserInput {
                     message: format!("Unknown act type alias: '{alias}'"),
                 })
             })?;
@@ -314,7 +314,7 @@ async fn dr_search(
         .since
         .as_deref()
         .map(|s| {
-            s.parse::<chrono::NaiveDate>().map_err(|_| LawyerrError::UserInput {
+            s.parse::<chrono::NaiveDate>().map_err(|_| LauyerError::UserInput {
                 message: format!("Invalid since date: '{s}'"),
             })
         })
@@ -324,7 +324,7 @@ async fn dr_search(
         .until
         .as_deref()
         .map(|s| {
-            s.parse::<chrono::NaiveDate>().map_err(|_| LawyerrError::UserInput {
+            s.parse::<chrono::NaiveDate>().map_err(|_| LauyerError::UserInput {
                 message: format!("Invalid until date: '{s}'"),
             })
         })
@@ -372,7 +372,7 @@ async fn dr_today(
     if let Some(ref type_str) = params.act_type {
         for alias in type_str.split(',').map(str::trim).filter(|s| !s.is_empty()) {
             let resolved = dr::resolve_act_type(alias).ok_or_else(|| {
-                AppError(LawyerrError::UserInput {
+                AppError(LauyerError::UserInput {
                     message: format!("Unknown act type alias: '{alias}'"),
                 })
             })?;
@@ -507,7 +507,7 @@ pub async fn start(
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
         .await
-        .map_err(|e| LawyerrError::Io { source: e })?;
+        .map_err(|e| LauyerError::Io { source: e })?;
 
     Ok(())
 }

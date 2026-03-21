@@ -3,7 +3,7 @@ use std::fmt::Write as _;
 
 use scraper::{Html, Selector};
 
-use crate::error::{LawyerrError, Result};
+use crate::error::{LauyerError, Result};
 
 // ---------------------------------------------------------------------------
 // DgsiDecision
@@ -42,20 +42,20 @@ pub fn parse_decision(html: &str, url: &str) -> Result<DgsiDecision> {
 
     // Selectors — all CSS strings are known-valid at compile time.
     let sel_table =
-        Selector::parse(r#"table[width="100%"][border="0"]"#).map_err(|e| LawyerrError::Parse {
+        Selector::parse(r#"table[width="100%"][border="0"]"#).map_err(|e| LauyerError::Parse {
             message: format!("bad table selector: {e:?}"),
             source_url: url.to_owned(),
         })?;
-    let sel_row = Selector::parse(r#"tr[valign="top"]"#).map_err(|e| LawyerrError::Parse {
+    let sel_row = Selector::parse(r#"tr[valign="top"]"#).map_err(|e| LauyerError::Parse {
         message: format!("bad tr selector: {e:?}"),
         source_url: url.to_owned(),
     })?;
-    let sel_cell = Selector::parse("td").map_err(|e| LawyerrError::Parse {
+    let sel_cell = Selector::parse("td").map_err(|e| LauyerError::Parse {
         message: format!("bad td selector: {e:?}"),
         source_url: url.to_owned(),
     })?;
     let sel_font_blue =
-        Selector::parse(r##"font[color="#000080"]"##).map_err(|e| LawyerrError::Parse {
+        Selector::parse(r##"font[color="#000080"]"##).map_err(|e| LauyerError::Parse {
             message: format!("bad font selector: {e:?}"),
             source_url: url.to_owned(),
         })?;
@@ -64,7 +64,7 @@ pub fn parse_decision(html: &str, url: &str) -> Result<DgsiDecision> {
     // bgcolor="#71B2CF". Multiple tables may match width/border; we pick the
     // first one that has at least one such label cell.
     let sel_label_cell =
-        Selector::parse(r##"td[bgcolor="#71B2CF"]"##).map_err(|e| LawyerrError::Parse {
+        Selector::parse(r##"td[bgcolor="#71B2CF"]"##).map_err(|e| LauyerError::Parse {
             message: format!("bad label cell selector: {e:?}"),
             source_url: url.to_owned(),
         })?;
@@ -72,7 +72,7 @@ pub fn parse_decision(html: &str, url: &str) -> Result<DgsiDecision> {
     let table = document
         .select(&sel_table)
         .find(|t| t.select(&sel_label_cell).next().is_some())
-        .ok_or_else(|| LawyerrError::Parse {
+        .ok_or_else(|| LauyerError::Parse {
             message: "decision table not found".to_owned(),
             source_url: url.to_owned(),
         })?;

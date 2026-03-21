@@ -1,7 +1,7 @@
-# ⚖️ lawyerr
+# ⚖️ lauyer
 
-![CI](https://github.com/nikuscs/lawyerr/actions/workflows/ci.yml/badge.svg)
-![Release](https://img.shields.io/github/v/release/nikuscs/lawyerr)
+![CI](https://github.com/nikuscs/lauyer/actions/workflows/ci.yml/badge.svg)
+![Release](https://img.shields.io/github/v/release/nikuscs/lauyer)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
 **Fast Rust CLI for searching Portuguese court jurisprudence (DGSI) and legislation (Diário da República), optimized for LLM consumption.**
@@ -29,43 +29,43 @@
 
 ```bash
 # From source (requires Rust 1.85+)
-cargo install --git https://github.com/nikuscs/lawyerr
+cargo install --git https://github.com/nikuscs/lauyer
 
 # Or clone and build
-git clone https://github.com/nikuscs/lawyerr
-cd lawyerr
+git clone https://github.com/nikuscs/lauyer
+cd lauyer
 cargo build --release
 ```
 
-Pre-built binaries available in [Releases](https://github.com/nikuscs/lawyerr/releases).
+Pre-built binaries available in [Releases](https://github.com/nikuscs/lauyer/releases).
 
 ## DGSI — Court Jurisprudence
 
 ```bash
 # Search all 10 courts in parallel
-lawyerr dgsi search "usucapião"
+lauyer dgsi search "usucapião"
 
 # Search specific court
-lawyerr dgsi search "contrato trabalho" --court stj
+lauyer dgsi search "contrato trabalho" --court stj
 
 # Multiple courts
-lawyerr dgsi search "responsabilidade civil" --court stj --court rel-porto
+lauyer dgsi search "responsabilidade civil" --court stj --court rel-porto
 
 # Date filtering
-lawyerr dgsi search "despejo" --since 2024-01-01 --until 2024-12-31
-lawyerr dgsi search "arrendamento" --recent 1y
+lauyer dgsi search "despejo" --since 2024-01-01 --until 2024-12-31
+lauyer dgsi search "arrendamento" --recent 1y
 
 # Sort by date, limit results
-lawyerr dgsi search "herança" --limit 10 --sort date
+lauyer dgsi search "herança" --limit 10 --sort date
 
 # Fetch full decision text for each result
-lawyerr dgsi search "abuso de direito" --court stj --limit 3 --fetch-full
+lauyer dgsi search "abuso de direito" --court stj --limit 3 --fetch-full
 
 # Fetch a single decision by URL
-lawyerr dgsi fetch "https://www.dgsi.pt/jstj.nsf/..."
+lauyer dgsi fetch "https://www.dgsi.pt/jstj.nsf/..."
 
 # List all courts
-lawyerr dgsi courts
+lauyer dgsi courts
 ```
 
 **Courts:** `stj`, `sta`, `conflitos`, `rel-porto`, `rel-lisboa`, `rel-coimbra`, `rel-guimaraes`, `rel-evora`, `tca-sul`, `tca-norte`
@@ -74,26 +74,26 @@ lawyerr dgsi courts
 
 ```bash
 # Search Portarias from the past week
-lawyerr dr search --type portaria --recent 1w
+lauyer dr search --type portaria --recent 1w
 
 # Full-text search
-lawyerr dr search "trabalho" --type decreto-lei --recent 1m
+lauyer dr search "trabalho" --type decreto-lei --recent 1m
 
 # Search 2nd series (Despachos, Avisos)
-lawyerr dr search --content atos-2 --type despacho --recent 1w
+lauyer dr search --content atos-2 --type despacho --recent 1w
 
 # Judicial decisions published in DR
-lawyerr dr search --content decisoes --recent 1m
+lauyer dr search --content decisoes --recent 1m
 
 # Date range
-lawyerr dr search --type portaria --since 2026-03-01 --until 2026-03-21
+lauyer dr search --type portaria --since 2026-03-01 --until 2026-03-21
 
 # Today's publications
-lawyerr dr today
-lawyerr dr today --type portaria
+lauyer dr today
+lauyer dr today --type portaria
 
 # List act types
-lawyerr dr types
+lauyer dr types
 ```
 
 **Content types:** `atos-1` (1st series), `atos-2` (2nd series), `dr` (whole DR issues), `decisoes` (judicial decisions)
@@ -103,9 +103,9 @@ lawyerr dr types
 ## Output Formats
 
 ```bash
-lawyerr dgsi search "insolvência" --court stj --format markdown  # default
-lawyerr dgsi search "insolvência" --court stj --format json      # structured
-lawyerr dgsi search "insolvência" --court stj --format table     # terminal
+lauyer dgsi search "insolvência" --court stj --format markdown  # default
+lauyer dgsi search "insolvência" --court stj --format json      # structured
+lauyer dgsi search "insolvência" --court stj --format table     # terminal
 ```
 
 ## Global Options
@@ -122,7 +122,7 @@ lawyerr dgsi search "insolvência" --court stj --format table     # terminal
 
 ## Configuration
 
-Create `lawyerr.toml` in the working directory or `~/.config/lawyerr/lawyerr.toml`:
+Create `lauyer.toml` in the working directory or `~/.config/lauyer/lauyer.toml`:
 
 ```toml
 [http]
@@ -144,7 +144,7 @@ port = 3000
 ## Server Mode
 
 ```bash
-lawyerr serve --port 3000
+lauyer serve --port 3000
 ```
 
 **`GET /dgsi/search`** `?q=usucapiao&court=stj&limit=5&since=2024-01-01&sort=date&format=json&compact=true&fetch_full=false`
@@ -161,13 +161,13 @@ lawyerr serve --port 3000
 
 **`GET /health`**
 
-All endpoints default to markdown. Add `?format=json` for JSON. Env vars: `LAWYERR_PORT`, `LAWYERR_HOST`.
+All endpoints default to markdown. Add `?format=json` for JSON. Env vars: `LAUYER_PORT`, `LAUYER_HOST`.
 
 ### Docker
 
 ```bash
-docker build -t lawyerr .
-docker run -p 3000:3000 lawyerr serve
+docker build -t lauyer .
+docker run -p 3000:3000 lauyer serve
 ```
 
 ## Related Projects

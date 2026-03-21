@@ -1,4 +1,4 @@
-use lawyerr::compact::{compact_text, strip_boilerplate, strip_html_tags, strip_stopwords};
+use lauyer::compact::{compact_text, strip_boilerplate, strip_html_tags, strip_stopwords};
 
 #[test]
 fn compact_collapses_blank_lines() {

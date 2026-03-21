@@ -4,7 +4,7 @@ use chrono::NaiveDate;
 use scraper::{Html, Selector};
 use tracing::warn;
 
-use crate::error::{LawyerrError, Result};
+use crate::error::{LauyerError, Result};
 
 // ---------------------------------------------------------------------------
 // Query builder
@@ -55,23 +55,23 @@ pub fn parse_search_results(html: &str, base_db: &str) -> Result<(u64, Vec<DgsiS
 
     let total = parse_total(&document, base_db)?;
 
-    let row_sel = Selector::parse("tr[valign=\"top\"]").map_err(|e| LawyerrError::Parse {
+    let row_sel = Selector::parse("tr[valign=\"top\"]").map_err(|e| LauyerError::Parse {
         message: e.to_string(),
         source_url: base_db.to_owned(),
     })?;
-    let td_sel = Selector::parse("td").map_err(|e| LawyerrError::Parse {
+    let td_sel = Selector::parse("td").map_err(|e| LauyerError::Parse {
         message: e.to_string(),
         source_url: base_db.to_owned(),
     })?;
-    let img_sel = Selector::parse("img").map_err(|e| LawyerrError::Parse {
+    let img_sel = Selector::parse("img").map_err(|e| LauyerError::Parse {
         message: e.to_string(),
         source_url: base_db.to_owned(),
     })?;
-    let font_sel = Selector::parse("font").map_err(|e| LawyerrError::Parse {
+    let font_sel = Selector::parse("font").map_err(|e| LauyerError::Parse {
         message: e.to_string(),
         source_url: base_db.to_owned(),
     })?;
-    let a_sel = Selector::parse("a").map_err(|e| LawyerrError::Parse {
+    let a_sel = Selector::parse("a").map_err(|e| LauyerError::Parse {
         message: e.to_string(),
         source_url: base_db.to_owned(),
     })?;
@@ -155,7 +155,7 @@ pub fn parse_search_results(html: &str, base_db: &str) -> Result<(u64, Vec<DgsiS
 // ---------------------------------------------------------------------------
 
 fn parse_total(document: &Html, source_url: &str) -> Result<u64> {
-    let h4_sel = Selector::parse("h4").map_err(|e| LawyerrError::Parse {
+    let h4_sel = Selector::parse("h4").map_err(|e| LauyerError::Parse {
         message: e.to_string(),
         source_url: source_url.to_owned(),
     })?;
@@ -169,14 +169,14 @@ fn parse_total(document: &Html, source_url: &str) -> Result<u64> {
     h4_text.split(';').nth(1).map_or_else(
         || {
             let num_str = h4_text.split_whitespace().next().unwrap_or("0");
-            num_str.parse::<u64>().map_err(|e| LawyerrError::Parse {
+            num_str.parse::<u64>().map_err(|e| LauyerError::Parse {
                 message: format!("could not parse total from h4 '{h4_text}': {e}"),
                 source_url: source_url.to_owned(),
             })
         },
         |found_str| {
             let num_str = found_str.split_whitespace().next().unwrap_or("0");
-            num_str.parse::<u64>().map_err(|e| LawyerrError::Parse {
+            num_str.parse::<u64>().map_err(|e| LauyerError::Parse {
                 message: format!("could not parse total from h4 '{h4_text}': {e}"),
                 source_url: source_url.to_owned(),
             })

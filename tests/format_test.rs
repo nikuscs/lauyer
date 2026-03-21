@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use lawyerr::format::{
+use lauyer::format::{
     OutputFormat, Renderable, SearchResponse, format_from_extension, parse_recent, render,
     write_output,
 };
@@ -245,7 +245,7 @@ struct JsonOnlyResult {
     value: String,
 }
 
-impl lawyerr::format::Renderable for JsonOnlyResult {
+impl lauyer::format::Renderable for JsonOnlyResult {
     fn to_markdown(&self) -> String {
         format!("{}: {}", self.label, self.value)
     }

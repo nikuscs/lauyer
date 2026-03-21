@@ -5,8 +5,8 @@ use anyhow::Context as _;
 use clap::Parser as _;
 use futures::stream::{FuturesUnordered, StreamExt as _};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use lawyerr::format::Renderable;
-use lawyerr::{cli, config, dgsi, dr, format, http, server};
+use lauyer::format::Renderable;
+use lauyer::{cli, config, dgsi, dr, format, http, server};
 
 #[tokio::main]
 #[allow(clippy::too_many_lines, clippy::literal_string_with_formatting_args)]

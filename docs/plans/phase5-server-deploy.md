@@ -1,11 +1,11 @@
 # Phase 5: HTTP Server & Deployment
 
-**Goal:** Add `lawyerr serve` command that exposes both DGSI and DR as REST endpoints via Axum. Add Dockerfile for Unraid/VPS deployment. After this phase, any LLM with web fetch (claude.ai skills, etc.) can search Portuguese law via HTTP.
+**Goal:** Add `lauyer serve` command that exposes both DGSI and DR as REST endpoints via Axum. Add Dockerfile for Unraid/VPS deployment. After this phase, any LLM with web fetch (claude.ai skills, etc.) can search Portuguese law via HTTP.
 
 **Depends on:** Phase 2 (DGSI), Phase 3 (DR), Phase 4 (formatting)
 
 **Reference projects:**
-- `~/projects/olx-tracker` — Axum server wrapping CLI commands (`src/server/`). Check for: router setup, handler patterns, AppState, graceful shutdown. This is the closest reference for `lawyerr serve`.
+- `~/projects/olx-tracker` — Axum server wrapping CLI commands (`src/server/`). Check for: router setup, handler patterns, AppState, graceful shutdown. This is the closest reference for `lauyer serve`.
 - `~/projects/crauler` — Axum server with proxy routing. Check `crates/crauler/src/` for server patterns.
 
 ---
@@ -21,9 +21,9 @@
       dr_session: RwLock<DrSession>, // DR session (refreshable)
   }
   ```
-- [ ] Implement `lawyerr serve` command:
-  - `--port` (default: 3000, env: `LAWYERR_PORT`)
-  - `--host` (default: `0.0.0.0`, env: `LAWYERR_HOST`)
+- [ ] Implement `lauyer serve` command:
+  - `--port` (default: 3000, env: `LAUYER_PORT`)
+  - `--host` (default: `0.0.0.0`, env: `LAUYER_HOST`)
 - [ ] Set up Axum router with all endpoints
 - [ ] Graceful shutdown on SIGTERM/SIGINT (`tokio::signal`)
 - [ ] Log startup: `Listening on http://{host}:{port}`
@@ -67,7 +67,7 @@
 - [ ] CORS headers if needed (for browser-based clients)
 
 ### Error Handling
-- [ ] Map `LawyerrError` to appropriate HTTP status codes:
+- [ ] Map `LauyerError` to appropriate HTTP status codes:
   - `Http` → 502 (bad gateway — upstream failed)
   - `Parse` → 500 (internal — our parsing failed)
   - `Session` → 503 (service unavailable — DR session issue, retry)
@@ -84,17 +84,17 @@
 
   FROM debian:bookworm-slim
   RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
-  COPY --from=builder /app/target/release/lawyerr /usr/local/bin/
+  COPY --from=builder /app/target/release/lauyer /usr/local/bin/
   EXPOSE 3000
-  CMD ["lawyerr", "serve", "--port", "3000", "--host", "0.0.0.0"]
+  CMD ["lauyer", "serve", "--port", "3000", "--host", "0.0.0.0"]
   ```
 - [ ] Create `.dockerignore`: `target/`, `.git/`, `docs/`
-- [ ] Test `docker build -t lawyerr .`
-- [ ] Test `docker run -p 3000:3000 lawyerr`
+- [ ] Test `docker build -t lauyer .`
+- [ ] Test `docker run -p 3000:3000 lauyer`
 - [ ] Verify endpoints work from host: `curl http://localhost:3000/health`
 
 ### Verification
-- [ ] `lawyerr serve` — starts server, shows listening address
+- [ ] `lauyer serve` — starts server, shows listening address
 - [ ] `curl http://localhost:3000/health` — returns OK
 - [ ] `curl "http://localhost:3000/dgsi/search?q=usucapião&court=stj&limit=3"` — returns JSON results
 - [ ] `curl "http://localhost:3000/dgsi/courts"` — returns court list

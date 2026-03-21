@@ -59,17 +59,17 @@
 - [ ] For DGSI: strip HTML from decision text fields before applying
 
 ### Combined Search (bonus)
-- [ ] Consider: `lawyerr search "trabalho"` (no subcommand) → searches BOTH DGSI and DR in parallel
+- [ ] Consider: `lauyer search "trabalho"` (no subcommand) → searches BOTH DGSI and DR in parallel
 - [ ] Merge results by date, label source
 - [ ] This is optional/future — don't block on it
 
 ### Verification
-- [ ] `lawyerr dgsi search "contrato" --court stj --format json | jq .` — valid JSON, parseable by jq
-- [ ] `lawyerr dgsi search "contrato" --court stj --format table` — aligned table output
-- [ ] `lawyerr dr search --type portaria --recent 1w --output portarias.md` — writes file
-- [ ] `lawyerr dgsi search "contrato" --quiet 2>/dev/null` — only results, no progress
-- [ ] `lawyerr dgsi search "contrato" --court stj --recent 1y` — works as shorthand
-- [ ] `lawyerr dgsi search "contrato" --court stj --strip-stopwords` — shorter output
-- [ ] Pipe test: `lawyerr dgsi search "contrato" --court stj --quiet | wc -l` — works cleanly
+- [ ] `lauyer dgsi search "contrato" --court stj --format json | jq .` — valid JSON, parseable by jq
+- [ ] `lauyer dgsi search "contrato" --court stj --format table` — aligned table output
+- [ ] `lauyer dr search --type portaria --recent 1w --output portarias.md` — writes file
+- [ ] `lauyer dgsi search "contrato" --quiet 2>/dev/null` — only results, no progress
+- [ ] `lauyer dgsi search "contrato" --court stj --recent 1y` — works as shorthand
+- [ ] `lauyer dgsi search "contrato" --court stj --strip-stopwords` — shorter output
+- [ ] Pipe test: `lauyer dgsi search "contrato" --court stj --quiet | wc -l` — works cleanly
 
 **Quality gate:** `cargo fmt --check && cargo clippy -- -D warnings && cargo test` must pass before this phase is complete.

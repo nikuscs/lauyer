@@ -10,7 +10,7 @@ pub enum SortOrder {
 
 #[derive(Parser)]
 #[command(
-    name = "lawyerr",
+    name = "lauyer",
     about = "Fast CLI for searching Portuguese legal jurisprudence and legislation"
 )]
 pub struct Cli {
@@ -18,7 +18,7 @@ pub struct Cli {
     pub command: Commands,
 
     /// Path to config file
-    #[arg(long, env = "LAWYERR_CONFIG")]
+    #[arg(long, env = "LAUYER_CONFIG")]
     pub config: Option<PathBuf>,
 
     /// Proxy URL (e.g., socks5://host:port)
@@ -181,10 +181,10 @@ pub struct DrTodayArgs {
 #[derive(Args)]
 pub struct ServeArgs {
     /// Host address to bind to
-    #[arg(long, default_value = "0.0.0.0", env = "LAWYERR_HOST")]
+    #[arg(long, default_value = "0.0.0.0", env = "LAUYER_HOST")]
     pub host: String,
 
     /// Port to listen on
-    #[arg(long, default_value_t = 3000, env = "LAWYERR_PORT")]
+    #[arg(long, default_value_t = 3000, env = "LAUYER_PORT")]
     pub port: u16,
 }

@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-pub enum LawyerrError {
+pub enum LauyerError {
     #[error("HTTP error fetching '{url}': {source}")]
     Http {
         #[source]
@@ -31,9 +31,9 @@ pub enum LawyerrError {
     },
 }
 
-pub type Result<T> = std::result::Result<T, LawyerrError>;
+pub type Result<T> = std::result::Result<T, LauyerError>;
 
-impl From<reqwest::Error> for LawyerrError {
+impl From<reqwest::Error> for LauyerError {
     fn from(source: reqwest::Error) -> Self {
         let url = source.url().map_or_else(|| "<unknown>".to_owned(), ToString::to_string);
         Self::Http { source, url }

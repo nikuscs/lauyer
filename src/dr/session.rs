@@ -1,7 +1,7 @@
 use serde_json::Value;
 use tracing::info;
 
-use crate::error::{LawyerrError, Result};
+use crate::error::{LauyerError, Result};
 use crate::http::{HttpClient, HttpFetcher};
 
 /// Hardcoded anonymous CSRF token from `OutSystems.js`.
@@ -53,7 +53,7 @@ impl DrSession {
         })?;
 
         let version_json: Value =
-            serde_json::from_str(&version_text).map_err(|e| LawyerrError::Parse {
+            serde_json::from_str(&version_text).map_err(|e| LauyerError::Parse {
                 message: format!("Failed to parse moduleversioninfo JSON: {e}"),
                 source_url: version_info_url.to_owned(),
             })?;
@@ -61,7 +61,7 @@ impl DrSession {
         let module_version = version_json
             .get("versionToken")
             .and_then(Value::as_str)
-            .ok_or_else(|| LawyerrError::Parse {
+            .ok_or_else(|| LauyerError::Parse {
                 message: "Missing versionToken in moduleversioninfo response".to_owned(),
                 source_url: version_info_url.to_owned(),
             })?
@@ -76,13 +76,13 @@ impl DrSession {
             .header("X-CSRFToken", CSRF_TOKEN)
             .send()
             .await
-            .map_err(|e| LawyerrError::Http { source: e, url: roles_url.to_owned() })?;
+            .map_err(|e| LauyerError::Http { source: e, url: roles_url.to_owned() })?;
 
         info!("DR session cookies set via roles endpoint");
 
         // Step 3: parse and clean the embedded template
         let mut template: Value =
-            serde_json::from_str(TEMPLATE_JSON).map_err(|e| LawyerrError::Parse {
+            serde_json::from_str(TEMPLATE_JSON).map_err(|e| LauyerError::Parse {
                 message: format!("Failed to parse embedded DR body template: {e}"),
                 source_url: "embedded:dr_request_template.json".to_owned(),
             })?;
@@ -126,24 +126,37 @@ impl DrSession {
     /// session. Uses the same logic as [`new_from_urls`] steps 1-2, without
     /// re-parsing the embedded body template.
     pub async fn refresh(&mut self) -> Result<()> {
+        self.refresh_from_urls(VERSION_INFO_URL, ROLES_URL).await
+    }
+
+    /// Refresh the session using explicit endpoint URLs.
+    ///
+    /// Identical to [`refresh`] but lets callers override the version-info and
+    /// roles URLs — primarily useful in tests where a mock server replaces
+    /// the real DR endpoints.
+    pub async fn refresh_from_urls(
+        &mut self,
+        version_info_url: &str,
+        roles_url: &str,
+    ) -> Result<()> {
         // Step 1: re-fetch module version
-        let version_text = self.client.get_text(VERSION_INFO_URL).await.map_err(|e| {
+        let version_text = self.client.get_text(version_info_url).await.map_err(|e| {
             tracing::warn!(error = %e, "Failed to fetch DR module version info during refresh");
             e
         })?;
 
         let version_json: Value =
-            serde_json::from_str(&version_text).map_err(|e| LawyerrError::Parse {
+            serde_json::from_str(&version_text).map_err(|e| LauyerError::Parse {
                 message: format!("Failed to parse moduleversioninfo JSON: {e}"),
-                source_url: VERSION_INFO_URL.to_owned(),
+                source_url: version_info_url.to_owned(),
             })?;
 
         let module_version = version_json
             .get("versionToken")
             .and_then(Value::as_str)
-            .ok_or_else(|| LawyerrError::Parse {
+            .ok_or_else(|| LauyerError::Parse {
                 message: "Missing versionToken in moduleversioninfo response".to_owned(),
-                source_url: VERSION_INFO_URL.to_owned(),
+                source_url: version_info_url.to_owned(),
             })?
             .to_owned();
 
@@ -153,11 +166,11 @@ impl DrSession {
         let _roles_response = self
             .client
             .inner()
-            .get(ROLES_URL)
+            .get(roles_url)
             .header("X-CSRFToken", CSRF_TOKEN)
             .send()
             .await
-            .map_err(|e| LawyerrError::Http { source: e, url: ROLES_URL.to_owned() })?;
+            .map_err(|e| LauyerError::Http { source: e, url: roles_url.to_owned() })?;
 
         info!("DR session cookies refreshed via roles endpoint");
 

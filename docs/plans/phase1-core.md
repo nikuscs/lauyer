@@ -16,17 +16,17 @@
 ## Checklist
 
 ### Project Setup
-- [ ] Initialize Cargo project: `cargo init --name lawyerr`
+- [ ] Initialize Cargo project: `cargo init --name lauyer`
 - [ ] Set up `Cargo.toml` with full metadata:
   ```toml
   [package]
-  name = "lawyerr"
+  name = "lauyer"
   version = "0.1.0"
   edition = "2024"
   rust-version = "1.85"
   description = "Fast CLI for searching Portuguese legal jurisprudence (DGSI) and legislation (Diário da República)"
   license = "MIT"
-  repository = "https://github.com/nikuscs/lawyerr"
+  repository = "https://github.com/nikuscs/lauyer"
   readme = "README.md"
   keywords = ["legal", "portugal", "cli", "dgsi", "rust"]
   categories = ["command-line-utilities"]
@@ -109,7 +109,7 @@
 - [ ] Verify `cargo build` compiles with empty modules
 
 ### Error Handling (`src/error.rs`)
-- [ ] Define `thiserror` error enum `LawyerrError` with variants:
+- [ ] Define `thiserror` error enum `LauyerError` with variants:
   - `Http { source, url }` — reqwest errors with context
   - `Parse { message, source_url }` — HTML/JSON parse failures
   - `Encoding { message }` — Latin-1/UTF-8 issues
@@ -117,7 +117,7 @@
   - `Config { message }` — config file errors
   - `Io { source }` — file I/O
 - [ ] Implement `From<reqwest::Error>`, `From<std::io::Error>`, etc.
-- [ ] Define `type Result<T> = std::result::Result<T, LawyerrError>`
+- [ ] Define `type Result<T> = std::result::Result<T, LauyerError>`
 
 ### HTTP Client Abstraction (`src/http.rs`)
 - [ ] Create `HttpClient` struct wrapping `reqwest::Client` with:
@@ -152,7 +152,7 @@
   - `HttpConfig`: `proxy: Option<String>`, `delay_ms: u64` (default 100), `max_concurrent: usize` (default 10), `timeout_secs: u64` (default 30), `retries: u32` (default 3)
   - `OutputConfig`: `format: OutputFormat` (default markdown), `compact: bool` (default true), `strip_stopwords: bool` (default false)
   - `ServerConfig`: `host: String` (default "0.0.0.0"), `port: u16` (default 3000)
-- [ ] Implement config loading: `./lawyerr.toml` → `~/.config/lawyerr/lawyerr.toml` → defaults
+- [ ] Implement config loading: `./lauyer.toml` → `~/.config/lauyer/lauyer.toml` → defaults
 - [ ] All config fields should have sensible defaults via `#[serde(default)]` (don't require a config file)
 - [ ] CLI flags override config file values (config provides defaults, CLI provides overrides)
 
@@ -211,7 +211,7 @@
   struct Cli {
       #[command(subcommand)]
       command: Commands,
-      #[arg(long, env = "LAWYERR_CONFIG")]
+      #[arg(long, env = "LAUYER_CONFIG")]
       config: Option<PathBuf>,
       #[arg(long)]
       proxy: Option<String>,
@@ -267,7 +267,7 @@
 ## CLAUDE.md Template
 
 Create `CLAUDE.md` at project root with:
-- [ ] Project overview (what lawyerr does, two modules: DGSI + DR)
+- [ ] Project overview (what lauyer does, two modules: DGSI + DR)
 - [ ] Tech stack (Rust 2024, tokio, reqwest, scraper, axum, clap)
 - [ ] Architecture (module tree matching `src/` structure)
 - [ ] Code standards: error handling (anyhow app / thiserror lib), async patterns, no unsafe, no println
@@ -285,7 +285,7 @@ Create `CLAUDE.md` at project root with:
 ## README.md Template
 
 Create `README.md` matching existing project style:
-- [ ] Title with emoji: `# ⚖️ lawyerr`
+- [ ] Title with emoji: `# ⚖️ lauyer`
 - [ ] One-line tagline
 - [ ] Disclaimer (educational/AI research use)
 - [ ] Features section (bullet points with key differentiators)

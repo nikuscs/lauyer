@@ -1,20 +1,20 @@
 use std::sync::Mutex;
 
-use lawyerr::dgsi::courts::Court;
-use lawyerr::dgsi::{
+use lauyer::dgsi::courts::Court;
+use lauyer::dgsi::{
     SearchParams, execute_search, fetch_full_decision, list_courts, resolve_courts,
     search_all_courts, search_court,
 };
-use lawyerr::error::{LawyerrError, Result};
-use lawyerr::http::HttpFetcher;
+use lauyer::error::{LauyerError, Result};
+use lauyer::http::HttpFetcher;
 
 // ---------------------------------------------------------------------------
 // MockHttpFetcher
 // ---------------------------------------------------------------------------
 
 // Responses are stored as `Ok(value)` or `Err(message_string)` so they can be
-// cloned freely (LawyerrError is not Clone).  Errors are materialised as
-// `LawyerrError::Session` at lookup time.
+// cloned freely (LauyerError is not Clone).  Errors are materialised as
+// `LauyerError::Session` at lookup time.
 //
 // Responses are matched by checking whether the requested URL *contains* one
 // of the registered pattern keys (checked in insertion order).  The first
@@ -51,11 +51,11 @@ impl HttpFetcher for MockHttpFetcher {
         let responses = self.bytes_responses.lock().unwrap();
         for (pattern, resp) in responses.iter() {
             if url.contains(pattern.as_str()) {
-                return resp.clone().map_err(|msg| LawyerrError::Session { message: msg });
+                return resp.clone().map_err(|msg| LauyerError::Session { message: msg });
             }
         }
         drop(responses);
-        Err(LawyerrError::Session {
+        Err(LauyerError::Session {
             message: format!("MockHttpFetcher: no bytes response registered for URL: {url}"),
         })
     }
@@ -64,11 +64,11 @@ impl HttpFetcher for MockHttpFetcher {
         let responses = self.text_responses.lock().unwrap();
         for (pattern, resp) in responses.iter() {
             if url.contains(pattern.as_str()) {
-                return resp.clone().map_err(|msg| LawyerrError::Session { message: msg });
+                return resp.clone().map_err(|msg| LauyerError::Session { message: msg });
             }
         }
         drop(responses);
-        Err(LawyerrError::Session {
+        Err(LauyerError::Session {
             message: format!("MockHttpFetcher: no text response registered for URL: {url}"),
         })
     }
@@ -79,7 +79,7 @@ impl HttpFetcher for MockHttpFetcher {
         _body: &serde_json::Value,
         _headers: &[(String, String)],
     ) -> Result<String> {
-        Err(LawyerrError::Session {
+        Err(LauyerError::Session {
             message: format!("MockHttpFetcher: post_json not configured for URL: {url}"),
         })
     }
