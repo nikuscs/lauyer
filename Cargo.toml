@@ -33,7 +33,7 @@ encoding_rs = "0.8"
 # Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-toml = "0.8"
+toml = "1.0"
 
 # URL percent-encoding (for DGSI search queries)
 percent-encoding = "2"
