@@ -203,37 +203,6 @@ fn dr_search_result_no_date() {
 }
 
 // ---------------------------------------------------------------------------
-// Integration tests (require network, marked #[ignore])
-// ---------------------------------------------------------------------------
-
-#[tokio::test]
-#[ignore = "requires network access to diariodarepublica.pt"]
-async fn live_dr_session_init() {
-    let client = lauyer::http::HttpClient::new(None, 30, 3).unwrap();
-    let session = lauyer::dr::DrSession::new(client).await.unwrap();
-    assert!(!session.module_version().is_empty());
-}
-
-#[tokio::test]
-#[ignore = "requires network access to diariodarepublica.pt"]
-async fn live_dr_search_portarias() {
-    let client = lauyer::http::HttpClient::new(None, 30, 3).unwrap();
-    let session = lauyer::dr::DrSession::new(client).await.unwrap();
-    let params = lauyer::dr::DrSearchParams {
-        content_types: vec![lauyer::dr::DrContentType::AtosSerie1],
-        query: String::new(),
-        act_types: vec!["Portaria".to_owned()],
-        series: vec![],
-        since: Some(chrono::Local::now().date_naive() - chrono::Duration::weeks(1)),
-        until: Some(chrono::Local::now().date_naive()),
-        limit: 5,
-    };
-    let response = lauyer::dr::search(&session, &params).await.unwrap();
-    assert!(response.total > 0);
-    assert!(!response.results.is_empty());
-}
-
-// ---------------------------------------------------------------------------
 // build_pesquisa_cookie — URL-encoding and structure
 // ---------------------------------------------------------------------------
 
@@ -1320,48 +1289,6 @@ fn parse_dr_fixture_new_fields() {
     assert_eq!(first.file_id, "file1");
     assert_eq!(first.tipo_conteudo, "AtosSerie1");
     assert_eq!(first.ano, Some(2026));
-}
-
-// ---------------------------------------------------------------------------
-// Integration tests — series 2 and text query (require network)
-// ---------------------------------------------------------------------------
-
-#[tokio::test]
-#[ignore = "requires network access to diariodarepublica.pt"]
-async fn live_dr_search_atos_serie2() {
-    let client = lauyer::http::HttpClient::new(None, 30, 3).unwrap();
-    let session = lauyer::dr::DrSession::new(client).await.unwrap();
-    let params = lauyer::dr::DrSearchParams {
-        content_types: vec![lauyer::dr::DrContentType::AtosSerie2],
-        query: String::new(),
-        act_types: vec!["Despacho".to_owned()],
-        series: vec![],
-        since: Some(chrono::Local::now().date_naive() - chrono::Duration::weeks(1)),
-        until: Some(chrono::Local::now().date_naive()),
-        limit: 5,
-    };
-    let response = lauyer::dr::search(&session, &params).await.unwrap();
-    assert!(response.total > 0);
-    assert!(!response.results.is_empty());
-}
-
-#[tokio::test]
-#[ignore = "requires network access to diariodarepublica.pt"]
-async fn live_dr_search_text_query() {
-    let client = lauyer::http::HttpClient::new(None, 30, 3).unwrap();
-    let session = lauyer::dr::DrSession::new(client).await.unwrap();
-    let params = lauyer::dr::DrSearchParams {
-        content_types: vec![lauyer::dr::DrContentType::AtosSerie1],
-        query: "trabalho".to_owned(),
-        act_types: vec![],
-        series: vec![],
-        since: Some(chrono::Local::now().date_naive() - chrono::Duration::days(30)),
-        until: Some(chrono::Local::now().date_naive()),
-        limit: 5,
-    };
-    let response = lauyer::dr::search(&session, &params).await.unwrap();
-    assert!(response.total > 0);
-    assert!(!response.results.is_empty());
 }
 
 // ---------------------------------------------------------------------------

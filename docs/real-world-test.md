@@ -173,6 +173,46 @@ RUST_LOG=debug lauyer --config /tmp/lauyer_test.toml dgsi search "fiança" --cou
 ```
 - [ ] Config loaded (debug logs show path)
 
+### `--proxy` — Proxy support
+```bash
+lauyer --proxy "socks5://127.0.0.1:9999" dgsi search "teste" --court stj --limit 1
+```
+- [ ] Connection error referencing proxy (confirms proxy is being used)
+- [ ] Does not fall back to direct connection
+
+---
+
+## CLI — DGSI (additional params)
+
+### `dgsi search` — `--max-concurrent`
+```bash
+lauyer dgsi search "contrato" --court stj --limit 3 --fetch-full --max-concurrent 1
+```
+- [ ] Fetches full decisions sequentially (one at a time)
+- [ ] Slower than default concurrency
+
+### `dgsi search` — `--delay-ms`
+```bash
+lauyer dgsi search "contrato" --court stj --limit 2 --fetch-full --delay-ms 500
+```
+- [ ] Visible delay between fetches
+- [ ] Results still returned correctly
+
+### `dgsi search` — Default limit (50)
+```bash
+lauyer dgsi search "contrato" --court stj
+```
+- [ ] Returns up to 50 results (default)
+- [ ] Total count may be higher than 50
+
+### `dgsi courts` — JSON format
+```bash
+lauyer --format json dgsi courts
+```
+- [ ] Valid JSON array
+- [ ] Each entry has `alias` and `name` fields
+- [ ] 10 courts listed
+
 ---
 
 ## CLI — DR (Diário da República)
@@ -277,11 +317,71 @@ lauyer --strip-stopwords dr search "regulamento" --type portaria --recent 1m --l
 ```
 - [ ] Stop words removed from sumário text
 
+### `dr search` — Multiple content types
+```bash
+lauyer dr search --content atos-1 --content atos-2 --recent 1w --limit 5
+```
+- [ ] Returns results from both 1st and 2nd series
+- [ ] Mixed act types in output
+
+### `dr search` — With --limit
+```bash
+lauyer dr search --type portaria --recent 1m --limit 3
+```
+- [ ] Returns exactly 3 results (or fewer if less available)
+
+### `dr types` — JSON format
+```bash
+lauyer --format json dr types
+```
+- [ ] Valid JSON array
+- [ ] Each entry has `alias` and `name` fields
+- [ ] 10 act types listed
+
 ### `dr fetch` — Not implemented
 ```bash
 lauyer dr fetch "https://example.com"
 ```
 - [ ] Returns error (not implemented yet)
+
+---
+
+## Error Handling
+
+### `--recent` + `--since` mutual exclusion
+```bash
+lauyer dgsi search "teste" --court stj --recent 1m --since 2024-01-01
+```
+- [ ] Returns error: mutually exclusive
+- [ ] Non-zero exit code
+
+### Invalid `--court` alias
+```bash
+lauyer dgsi search "teste" --court invalid-court
+```
+- [ ] Returns error about unknown court alias
+- [ ] Non-zero exit code
+
+### Invalid `--type` alias
+```bash
+lauyer dr search --type invalid-type --recent 1w
+```
+- [ ] Returns error about unknown act type
+- [ ] Non-zero exit code
+
+### Invalid date format
+```bash
+lauyer dgsi search "teste" --court stj --since "not-a-date"
+```
+- [ ] Returns error about invalid date
+- [ ] Non-zero exit code
+
+### Invalid `--config` path
+```bash
+lauyer --config /tmp/nonexistent.toml dgsi courts
+```
+- [ ] Returns error: config file not found
+- [ ] Non-zero exit code
 
 ---
 
