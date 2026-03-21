@@ -108,7 +108,14 @@ pub async fn search_all_courts(
         .map(|&court| {
             let sem = Arc::clone(&semaphore);
             async move {
-                let _permit = sem.acquire().await.expect("semaphore closed");
+                let Ok(_permit) = sem.acquire().await else {
+                    return (
+                        court,
+                        Err(LauyerError::Session {
+                            message: "concurrency semaphore closed".to_owned(),
+                        }),
+                    );
+                };
                 let outcome =
                     search_court(fetcher, court, query, limit, sort_by_date, delay_ms).await;
                 if let Err(ref e) = outcome {
