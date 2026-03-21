@@ -1,7 +1,9 @@
+use std::collections::HashMap;
+
 use chrono::NaiveDate;
 use lawyerr::dgsi::courts::Court;
-use lawyerr::dgsi::decision::parse_decision;
-use lawyerr::dgsi::search::{build_query, parse_search_results};
+use lawyerr::dgsi::decision::{DgsiDecision, parse_decision};
+use lawyerr::dgsi::search::{DgsiSearchResult, build_query, parse_search_results};
 use lawyerr::format::Renderable;
 
 // ---------------------------------------------------------------------------
@@ -202,4 +204,398 @@ fn resolve_courts_empty() {
 fn resolve_courts_unknown() {
     let result = lawyerr::dgsi::resolve_courts(&["not-a-real-court".to_owned()]);
     assert!(result.is_err(), "Unknown alias should return an error");
+}
+
+// ---------------------------------------------------------------------------
+// DgsiSearchResult helpers
+// ---------------------------------------------------------------------------
+
+fn make_search_result() -> DgsiSearchResult {
+    DgsiSearchResult {
+        relevance: 87,
+        date: NaiveDate::from_ymd_opt(2021, 6, 15).unwrap(),
+        processo: "1234/21.0T8LSB".to_owned(),
+        doc_url: "https://www.dgsi.pt/jstj.nsf/abc".to_owned(),
+        doc_unid: "abc".to_owned(),
+        relator: "JOÃO SILVA".to_owned(),
+        descriptors: vec!["USUCAPIÃO".to_owned(), "POSSE".to_owned()],
+    }
+}
+
+#[test]
+fn search_result_to_json() {
+    let r = make_search_result();
+    let json = r.to_json();
+
+    assert!(json.is_object(), "to_json must return an object");
+    let obj = json.as_object().unwrap();
+
+    assert_eq!(obj["processo"].as_str().unwrap(), "1234/21.0T8LSB");
+    assert_eq!(obj["relator"].as_str().unwrap(), "JOÃO SILVA");
+    assert_eq!(obj["relevance"].as_u64().unwrap(), 87);
+    assert_eq!(obj["date"].as_str().unwrap(), "2021-06-15");
+    assert_eq!(obj["url"].as_str().unwrap(), "https://www.dgsi.pt/jstj.nsf/abc");
+
+    let descriptors = obj["descriptors"].as_array().unwrap();
+    assert_eq!(descriptors.len(), 2);
+    assert_eq!(descriptors[0].as_str().unwrap(), "USUCAPIÃO");
+}
+
+#[test]
+fn search_result_table_row() {
+    let r = make_search_result();
+    let (headers, values) = r.table_row().expect("table_row must return Some");
+
+    assert_eq!(headers, vec!["Date", "Processo", "Relator", "Descritores"]);
+    assert_eq!(values[0], "2021-06-15");
+    assert_eq!(values[1], "1234/21.0T8LSB");
+    assert_eq!(values[2], "JOÃO SILVA");
+    assert!(values[3].contains("USUCAPIÃO"), "Descritores value should contain USUCAPIÃO");
+    assert!(values[3].contains("POSSE"), "Descritores value should contain POSSE");
+}
+
+// ---------------------------------------------------------------------------
+// DgsiDecision helpers
+// ---------------------------------------------------------------------------
+
+fn make_decision() -> DgsiDecision {
+    DgsiDecision {
+        processo: "084380".to_owned(),
+        relator: "MARIO CANCELA".to_owned(),
+        descritores: vec!["USUCAPIÃO".to_owned(), "PRESCRIÇÃO AQUISITIVA".to_owned()],
+        data_acordao: NaiveDate::from_ymd_opt(1994, 4, 21),
+        votacao: "UNANIMIDADE".to_owned(),
+        meio_processual: "REVISTA".to_owned(),
+        decisao: "NEGADA A REVISTA.".to_owned(),
+        sumario: "O prazo de usucapião é de 20 anos.".to_owned(),
+        texto_integral: "Texto completo da decisão.".to_owned(),
+        legislacao_nacional: String::new(),
+        jurisprudencia_nacional: String::new(),
+        doutrina: String::new(),
+        url: "https://www.dgsi.pt/jstj.nsf/test".to_owned(),
+        extra_fields: HashMap::new(),
+    }
+}
+
+#[test]
+fn decision_table_row() {
+    let d = make_decision();
+    let (headers, values) = d.table_row().expect("table_row must return Some");
+
+    assert_eq!(headers, vec!["Date", "Processo", "Relator", "Descritores"]);
+    assert_eq!(values[0], "1994-04-21");
+    assert_eq!(values[1], "084380");
+    assert_eq!(values[2], "MARIO CANCELA");
+    assert!(values[3].contains("USUCAPIÃO"), "Descritores should contain USUCAPIÃO");
+}
+
+#[test]
+fn decision_to_markdown_empty_fields() {
+    let mut d = make_decision();
+    d.sumario = String::new();
+    d.texto_integral = String::new();
+
+    let md = d.to_markdown();
+
+    assert!(md.contains("084380"), "markdown must contain processo");
+    assert!(!md.contains("## Sumário"), "empty sumario section must be omitted");
+    assert!(!md.contains("## Texto Integral"), "empty texto_integral section must be omitted");
+}
+
+#[test]
+fn decision_to_markdown_texto_integral_n_omitted() {
+    let mut d = make_decision();
+    d.texto_integral = "N".to_owned();
+
+    let md = d.to_markdown();
+
+    assert!(!md.contains("## Texto Integral"), "texto_integral='N' must be omitted");
+}
+
+#[test]
+fn decision_to_json_with_extra_fields() {
+    let mut d = make_decision();
+    d.extra_fields.insert("Tribunal".to_owned(), "STJ".to_owned());
+    d.extra_fields.insert("EmptyField".to_owned(), String::new());
+
+    let json = d.to_json();
+    let obj = json.as_object().unwrap();
+
+    assert_eq!(obj["Tribunal"].as_str().unwrap(), "STJ", "extra_fields must appear in JSON");
+    assert!(obj.get("EmptyField").is_none(), "empty extra_fields must be omitted");
+}
+
+// ---------------------------------------------------------------------------
+// Court property invariants
+// ---------------------------------------------------------------------------
+
+#[test]
+fn court_display_names() {
+    for court in Court::all() {
+        let name = court.display_name();
+        assert!(!name.is_empty(), "display_name() must not be empty for {court:?}");
+    }
+}
+
+#[test]
+fn court_db_names() {
+    for court in Court::all() {
+        let db = court.db();
+        // DGSI databases always use lowercase .nsf (Domino format); the
+        // comparison is intentionally case-sensitive.
+        #[allow(clippy::case_sensitive_file_extension_comparisons)]
+        let ends_nsf = db.ends_with(".nsf");
+        assert!(ends_nsf, "db() must end with '.nsf' for {court:?}, got '{db}'");
+    }
+}
+
+#[test]
+fn court_view_unids() {
+    for court in Court::all() {
+        let unid = court.view_unid();
+        let len = unid.len();
+        assert_eq!(len, 32, "view_unid() must be 32 hex chars for {court:?}, got len {len}");
+        assert!(
+            unid.chars().all(|c| c.is_ascii_hexdigit()),
+            "view_unid() must be all hex for {court:?}: '{unid}'"
+        );
+    }
+}
+
+#[test]
+fn court_display_trait() {
+    for court in Court::all() {
+        let display = court.to_string();
+        assert_eq!(
+            display,
+            court.display_name(),
+            "Display impl must match display_name() for {court:?}"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// parse_search_results — edge cases (search.rs uncovered branches)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn parse_search_results_zero_results() {
+    let html = r"<html><body><h4>0 documents found</h4><table></table></body></html>";
+    let (total, results) = parse_search_results(html, "test.nsf").unwrap();
+    assert_eq!(total, 0);
+    assert!(results.is_empty());
+}
+
+#[test]
+fn parse_search_results_malformed_rows() {
+    // Row with only 3 <td> columns — should be skipped (lines 83-85)
+    let html = r#"<html><body>
+<h4>10 documents found</h4>
+<table>
+  <tr valign="top"><td>col1</td><td>col2</td><td>col3</td></tr>
+</table>
+</body></html>"#;
+    let (total, results) = parse_search_results(html, "test.nsf").unwrap();
+    assert_eq!(total, 10);
+    assert!(results.is_empty(), "malformed rows must be skipped");
+}
+
+#[test]
+fn parse_search_results_bad_relevance() {
+    // Row with 5 tds but img alt without '%' — should be skipped (lines 95-97)
+    let html = r#"<html><body>
+<h4>10 documents found</h4>
+<table>
+  <tr valign="top">
+    <td><img alt="no-percent-here"/></td>
+    <td><font>04/21/1994</font></td>
+    <td><a href="/jstj.nsf/ABC">12345</a></td>
+    <td><font>RELATOR</font></td>
+    <td><font>DESC</font></td>
+  </tr>
+</table>
+</body></html>"#;
+    let (total, results) = parse_search_results(html, "test.nsf").unwrap();
+    assert_eq!(total, 10);
+    assert!(results.is_empty(), "row with un-parseable relevance must be skipped");
+}
+
+#[test]
+fn parse_search_results_bad_date() {
+    // Row with valid relevance but unparseable date — should be skipped (lines 105-107)
+    let html = r#"<html><body>
+<h4>10 documents found</h4>
+<table>
+  <tr valign="top">
+    <td><img alt="94%"/></td>
+    <td><font>not-a-date</font></td>
+    <td><a href="/jstj.nsf/ABC">12345</a></td>
+    <td><font>RELATOR</font></td>
+    <td><font>DESC</font></td>
+  </tr>
+</table>
+</body></html>"#;
+    let (total, results) = parse_search_results(html, "test.nsf").unwrap();
+    assert_eq!(total, 10);
+    assert!(results.is_empty(), "row with bad date must be skipped");
+}
+
+#[test]
+fn parse_search_results_no_anchor() {
+    // Row with valid relevance and date but no <a> in processo cell — should be skipped (lines 113-115)
+    let html = r#"<html><body>
+<h4>10 documents found</h4>
+<table>
+  <tr valign="top">
+    <td><img alt="94%"/></td>
+    <td><font>04/21/1994</font></td>
+    <td><font>no-link-here</font></td>
+    <td><font>RELATOR</font></td>
+    <td><font>DESC</font></td>
+  </tr>
+</table>
+</body></html>"#;
+    let (total, results) = parse_search_results(html, "test.nsf").unwrap();
+    assert_eq!(total, 10);
+    assert!(results.is_empty(), "row without anchor must be skipped");
+}
+
+#[test]
+fn parse_search_results_only_found_format() {
+    // h4 with "N documents found" (no semicolon) — exercises the fallback branch (lines 170-175)
+    let html = r"<html><body>
+<h4>42 documents found</h4>
+<table></table>
+</body></html>";
+    let (total, results) = parse_search_results(html, "test.nsf").unwrap();
+    assert_eq!(total, 42);
+    assert!(results.is_empty());
+}
+
+#[test]
+fn parse_search_results_returned_found_format() {
+    // h4 with "N documents returned; M found" — exercises the semicolon branch (lines 177-183)
+    let html = r"<html><body>
+<h4>10 documents returned; 1000 found</h4>
+<table></table>
+</body></html>";
+    let (total, results) = parse_search_results(html, "test.nsf").unwrap();
+    assert_eq!(total, 1000, "total should be the 'found' count after the semicolon");
+    assert!(results.is_empty());
+}
+
+#[test]
+fn parse_search_results_descriptors_with_br_and_tags() {
+    // Descriptors cell with <br> variants and inner tags — exercises split_by_br + strip_html_tags
+    let html = r#"<html><body>
+<h4>1 documents found</h4>
+<table>
+  <tr valign="top">
+    <td><img alt="94%"/></td>
+    <td><font>04/21/1994</font></td>
+    <td><a href="/jstj.nsf/ABC123">12345</a></td>
+    <td><font>RELATOR NAME</font></td>
+    <td><font><b>USUCAPIAO</b><br/>POSSE<br>AQUISICAO</font></td>
+  </tr>
+</table>
+</body></html>"#;
+    let (total, results) = parse_search_results(html, "test.nsf").unwrap();
+    assert_eq!(total, 1);
+    assert_eq!(results.len(), 1);
+    let r = &results[0];
+    assert!(
+        r.descriptors.iter().any(|d| d.contains("USUCAPIAO")),
+        "USUCAPIAO should be a descriptor: {:?}",
+        r.descriptors
+    );
+    assert!(
+        r.descriptors.iter().any(|d| d.contains("POSSE")),
+        "POSSE should be a descriptor: {:?}",
+        r.descriptors
+    );
+    assert!(
+        r.descriptors.iter().any(|d| d.contains("AQUISICAO")),
+        "AQUISICAO should be a descriptor: {:?}",
+        r.descriptors
+    );
+}
+
+// ---------------------------------------------------------------------------
+// parse_decision — edge cases (decision.rs uncovered branches)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn parse_decision_no_table() {
+    // HTML without the expected decision table → LawyerrError::Parse (lines 77-80)
+    let html = r"<html><body><p>No table here</p></body></html>";
+    let result = parse_decision(html, "https://example.com/test");
+    assert!(result.is_err(), "missing decision table must return an error");
+    let err = result.unwrap_err();
+    assert!(
+        err.to_string().contains("decision table not found"),
+        "error message should mention 'decision table not found': {err}"
+    );
+}
+
+#[test]
+fn parse_decision_empty_date() {
+    // Decision where "Data do Acordão" value is empty → data_acordao is None (lines 212-213)
+    let html = r##"<html><body>
+<table width="100%" border="0">
+  <tr valign="top">
+    <td bgcolor="#71B2CF"><font color="#000080">Data do Acord&#227;o:</font></td>
+    <td bgcolor="#E0F1FF"><font color="#000080"></font></td>
+  </tr>
+  <tr valign="top">
+    <td bgcolor="#71B2CF"><font color="#000080">Processo:</font></td>
+    <td bgcolor="#E0F1FF"><font color="#000080">99999</font></td>
+  </tr>
+</table>
+</body></html>"##;
+    let decision = parse_decision(html, "https://example.com/decision").unwrap();
+    assert!(decision.data_acordao.is_none(), "empty date value should produce data_acordao = None");
+    assert_eq!(decision.processo, "99999");
+}
+
+#[test]
+fn decision_format_date_none_via_markdown() {
+    // format_date(None) is pub(super); exercise it indirectly via to_markdown() (line 272)
+    use lawyerr::format::Renderable as _;
+    let mut d = make_decision();
+    d.data_acordao = None;
+    let md = d.to_markdown();
+    assert!(
+        md.contains("(unknown date)"),
+        "markdown of decision with no date should contain '(unknown date)': {md}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// LawyerrError From<reqwest::Error> (error.rs lines 35-40)
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn lawyerr_error_from_reqwest_error() {
+    use lawyerr::error::LawyerrError;
+
+    // Sending to an invalid scheme triggers a reqwest error without real network I/O.
+    let client = reqwest::Client::new();
+    let err = client.get("not://invalid-scheme/path").send().await.unwrap_err();
+    let lawyerr_err = LawyerrError::from(err);
+    let msg = lawyerr_err.to_string();
+    assert!(
+        msg.contains("HTTP error"),
+        "LawyerrError::from(reqwest::Error) should produce an Http variant: {msg}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// dr::search stub (dr/mod.rs lines 5-6)
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn dr_search_stub_returns_empty_vec() {
+    let result = lawyerr::dr::search().await;
+    assert!(result.is_ok(), "dr::search() should return Ok");
+    assert!(result.unwrap().is_empty(), "dr::search() should return an empty vec");
 }

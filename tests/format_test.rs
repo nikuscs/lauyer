@@ -234,3 +234,103 @@ fn render_table_empty_results() {
     let out = render(&response, &OutputFormat::Table, false, false);
     assert!(out.contains("(no results)"));
 }
+
+// -----------------------------------------------------------------------
+// truncate — multi-byte character boundary adjustment (format.rs 154-161)
+// -----------------------------------------------------------------------
+
+// DummyResult without table_row() so the JSON-key fallback path is exercised.
+struct JsonOnlyResult {
+    label: String,
+    value: String,
+}
+
+impl lawyerr::format::Renderable for JsonOnlyResult {
+    fn to_markdown(&self) -> String {
+        format!("{}: {}", self.label, self.value)
+    }
+
+    fn to_json(&self) -> serde_json::Value {
+        serde_json::json!({
+            "label": self.label,
+            "value": self.value,
+        })
+    }
+    // table_row() returns None (default), so build_table_data falls back to JSON keys
+}
+
+#[test]
+fn render_table_json_key_fallback() {
+    // Exercises build_table_data fallback branch (format.rs line 260)
+    let response = SearchResponse {
+        source: "TEST".to_owned(),
+        query: "foo".to_owned(),
+        total: 1,
+        results: vec![Box::new(JsonOnlyResult {
+            label: "hello".to_owned(),
+            value: "world".to_owned(),
+        })],
+    };
+    let out = render(&response, &OutputFormat::Table, false, false);
+    assert!(out.contains("label") || out.contains("value"), "JSON keys should appear as headers");
+    assert!(out.contains("hello") || out.contains("world"), "JSON values should appear in table");
+}
+
+#[test]
+fn truncate_multibyte_char_boundary() {
+    // "Acórdão" — 'ó' is 2 bytes, 'ã' is 2 bytes.
+    // Build a string longer than MAX_COL_WIDTH (50) so truncate is triggered,
+    // ending near a multi-byte char boundary.
+    // format.rs lines 154-161: truncate adjusts end to avoid splitting a char.
+    let s = "Acórdão do Supremo Tribunal de Justiça — Processo número 12345/20";
+    // Call render_table with a result that has this long value, which goes through truncate().
+    let response = SearchResponse {
+        source: "TEST".to_owned(),
+        query: "foo".to_owned(),
+        total: 1,
+        results: vec![Box::new(JsonOnlyResult { label: "desc".to_owned(), value: s.to_owned() })],
+    };
+    let out = render(&response, &OutputFormat::Table, false, false);
+    // The value must be truncated with "..." and must be valid UTF-8 (no panic = success).
+    assert!(out.contains("..."), "long value should be truncated with '...'");
+    // Verify the output is valid UTF-8 (it's a String, so this always holds, but the
+    // real check is that we didn't panic due to char boundary slicing).
+    assert!(std::str::from_utf8(out.as_bytes()).is_ok());
+}
+
+// -----------------------------------------------------------------------
+// format_from_extension — unknown / no-extension cases (format.rs line 283)
+// -----------------------------------------------------------------------
+
+#[test]
+fn format_from_extension_table_not_inferred() {
+    // "table" is not an extension — returns None (exercises the `_ => None` arm)
+    assert_eq!(format_from_extension(Path::new("out.csv")), None);
+    assert_eq!(format_from_extension(Path::new("out.xml")), None);
+    assert_eq!(format_from_extension(Path::new("out.txt")), None);
+}
+
+// -----------------------------------------------------------------------
+// parse_recent — additional edge cases (format.rs lines 346, 357)
+// -----------------------------------------------------------------------
+
+#[test]
+fn parse_recent_empty_string() {
+    // Empty string → error on is_empty check (line 320-322)
+    assert!(parse_recent("").is_err());
+}
+
+#[test]
+fn parse_recent_non_numeric() {
+    // Non-numeric prefix → parse::<i64> fails (line 327)
+    assert!(parse_recent("xw").is_err());
+    assert!(parse_recent("abcm").is_err());
+}
+
+#[test]
+fn parse_recent_year_leap_day() {
+    // 1y from a non-Feb-29 date should always succeed.
+    // This exercises the year path (lines 351-359).
+    let result = parse_recent("1y");
+    assert!(result.is_ok(), "1y should always succeed: {result:?}");
+}
