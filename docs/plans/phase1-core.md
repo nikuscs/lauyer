@@ -10,16 +10,29 @@
 
 ### Project Setup
 - [ ] Initialize Cargo project: `cargo init --name lawyerr`
-- [ ] Set up `Cargo.toml` with all dependencies (see initial plan Dependencies section)
-- [ ] Set Rust edition 2024, minimum Rust version
+- [ ] Set up `Cargo.toml` with full metadata:
+  ```toml
+  [package]
+  name = "lawyerr"
+  version = "0.1.0"
+  edition = "2024"
+  rust-version = "1.85"
+  description = "Fast CLI for searching Portuguese legal jurisprudence (DGSI) and legislation (Diário da República)"
+  license = "MIT"
+  repository = "https://github.com/nikuscs/lawyerr"
+  readme = "README.md"
+  keywords = ["legal", "portugal", "cli", "dgsi", "rust"]
+  categories = ["command-line-utilities"]
+  ```
+- [ ] Add all dependencies (see initial plan Dependencies section)
+- [ ] Add dev-dependencies: `wiremock`, `tokio-test`, `assert_cmd`, `tempfile`
 - [ ] Add `rustfmt.toml`:
   ```toml
+  edition = "2024"
   max_width = 100
   use_small_heuristics = "Max"
-  imports_granularity = "Module"
-  group_imports = "StdExternalCrate"
   ```
-- [ ] Add `clippy.toml` or configure in `Cargo.toml`:
+- [ ] Configure lints in `Cargo.toml` (NOT clippy.toml — matches existing projects):
   ```toml
   [lints.rust]
   unsafe_code = "forbid"
@@ -27,13 +40,48 @@
   [lints.clippy]
   all = { level = "warn", priority = -1 }
   pedantic = { level = "warn", priority = -1 }
-  # Allow these common pedantic false positives:
+  nursery = { level = "warn", priority = -1 }
+  # Pragmatic allows for CLI work:
   module_name_repetitions = "allow"
   must_use_candidate = "allow"
   missing_errors_doc = "allow"
   missing_panics_doc = "allow"
+  needless_pass_by_value = "allow"
+  future_not_send = "allow"
+  cast_possible_truncation = "allow"
+  cast_sign_loss = "allow"
+  # Strict denials:
+  dbg_macro = "deny"
+  todo = "deny"
+  unimplemented = "deny"
+  print_stdout = "deny"
+  print_stderr = "deny"
+
+  [profile.release]
+  lto = true
+  codegen-units = 1
+  strip = true
   ```
-- [ ] Add `.gitignore`: `target/`, `.env`, `*.swp`
+- [ ] Add `.gitignore`:
+  ```
+  /target/
+  .env
+  *.log
+  .DS_Store
+  config.toml
+  .idea/
+  .vscode/
+  *.swp
+  *.swo
+  *~
+  .claude/settings.local.json
+  tarpaulin-report.*
+  lcov.info
+  ```
+- [ ] Add `LICENSE` (MIT, copyright nikuscs)
+- [ ] Add `CLAUDE.md` (project-specific AI guidelines — see below)
+- [ ] Add `README.md` (see below)
+- [ ] Add `.github/workflows/ci.yml` (see below)
 - [ ] Create module directory structure:
   ```
   src/
@@ -206,6 +254,83 @@
 **Compact mode is post-processing, NOT baked into rendering.** The `Renderable::to_markdown()` produces raw markdown. `compact_text()` and `strip_stopwords()` are applied afterward in `format::render()`. This keeps the trait simple and the processing pipeline clear.
 
 **Config layering:** TOML file sets defaults → CLI flags override. Use `Option<T>` for CLI fields and merge: `cli_value.unwrap_or(config_value)`. Don't make config file mandatory.
+
+**No println!/eprintln!** — Use `tracing::info!`, `tracing::warn!`, `tracing::error!` for all output except the actual results. Results go to stdout, logs go to stderr via `tracing-subscriber`.
+
+## CLAUDE.md Template
+
+Create `CLAUDE.md` at project root with:
+- [ ] Project overview (what lawyerr does, two modules: DGSI + DR)
+- [ ] Tech stack (Rust 2024, tokio, reqwest, scraper, axum, clap)
+- [ ] Architecture (module tree matching `src/` structure)
+- [ ] Code standards: error handling (anyhow app / thiserror lib), async patterns, no unsafe, no println
+- [ ] Common commands:
+  ```
+  cargo fmt
+  cargo clippy --all-targets
+  cargo test
+  cargo build --release
+  ```
+- [ ] End-of-task workflow: **Always run `cargo fmt && cargo clippy --all-targets && cargo test` before committing**
+- [ ] How to add a new DGSI court / DR content type / act type
+- [ ] Reference to `docs/plans/initial.md` for API details
+
+## README.md Template
+
+Create `README.md` matching existing project style:
+- [ ] Title with emoji: `# ⚖️ lawyerr`
+- [ ] One-line tagline
+- [ ] Disclaimer (educational/AI research use)
+- [ ] Features section (bullet points with key differentiators)
+- [ ] Install section (cargo install from git + release binaries)
+- [ ] Usage examples with actual command output
+- [ ] Configuration section (TOML example)
+- [ ] How It Works (numbered technical pipeline)
+- [ ] Related Projects (links to crauler, amz-crawler, olx-tracker)
+- [ ] License (MIT)
+
+## CI/CD (`.github/workflows/ci.yml`)
+
+- [ ] Create CI workflow matching existing projects:
+  ```yaml
+  name: CI
+  on:
+    push: { branches: [main] }
+    pull_request: { branches: [main] }
+  concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+  env:
+    CARGO_TERM_COLOR: always
+    RUSTFLAGS: -Dwarnings
+  jobs:
+    check:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+        - uses: dtolnay/rust-toolchain@stable
+        - run: cargo check --all-targets
+    fmt:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+        - uses: dtolnay/rust-toolchain@stable
+          with: { components: rustfmt }
+        - run: cargo fmt --all -- --check
+    clippy:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+        - uses: dtolnay/rust-toolchain@stable
+          with: { components: clippy }
+        - run: cargo clippy --all-targets
+    test:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+        - uses: dtolnay/rust-toolchain@stable
+        - run: cargo test
+  ```
 
 ## Testability & Traits
 
