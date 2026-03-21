@@ -6,11 +6,6 @@ use std::io::Write as _;
 fn default_config_values() {
     let cfg = Config::default();
 
-    assert!(cfg.dgsi.courts.is_empty());
-
-    assert_eq!(cfg.dr.content_types, vec!["atos-1", "atos-2", "decisoes"]);
-    assert!(cfg.dr.act_types.is_empty());
-
     assert!(cfg.http.proxy.is_none());
     assert_eq!(cfg.http.delay_ms, 100);
     assert_eq!(cfg.http.max_concurrent, 10);

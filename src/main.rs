@@ -316,7 +316,7 @@ async fn main() -> anyhow::Result<()> {
 
                 // Resolve content types
                 let content_aliases = if args.content.is_empty() {
-                    cfg.dr.content_types.clone()
+                    vec!["atos-1".to_owned()]
                 } else {
                     args.content.clone()
                 };
@@ -414,7 +414,7 @@ async fn main() -> anyhow::Result<()> {
                 }
 
                 // Resolve content types from config defaults
-                let content_types = dr::resolve_content_types(&cfg.dr.content_types)
+                let content_types = dr::resolve_content_types(&[String::from("atos-1")])
                     .context("Failed to resolve content types")?;
 
                 // Resolve act types

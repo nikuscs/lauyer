@@ -8,30 +8,10 @@ use crate::format::OutputFormat;
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Default, Deserialize)]
-pub struct DgsiConfig {
-    /// Courts to query. Empty = all courts.
-    #[serde(default)]
-    pub courts: Vec<String>,
-}
+pub struct DgsiConfig {}
 
-fn default_dr_content_types() -> Vec<String> {
-    vec!["atos-1".to_owned(), "atos-2".to_owned(), "decisoes".to_owned()]
-}
-
-#[derive(Debug, Deserialize)]
-pub struct DrConfig {
-    #[serde(default = "default_dr_content_types")]
-    pub content_types: Vec<String>,
-
-    #[serde(default)]
-    pub act_types: Vec<String>,
-}
-
-impl Default for DrConfig {
-    fn default() -> Self {
-        Self { content_types: default_dr_content_types(), act_types: Vec::new() }
-    }
-}
+#[derive(Debug, Default, Deserialize)]
+pub struct DrConfig {}
 
 const fn default_delay_ms() -> u64 {
     100

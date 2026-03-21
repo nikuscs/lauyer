@@ -125,12 +125,6 @@ lawyerr dgsi search "insolvência" --court stj --format table     # terminal
 Create `lawyerr.toml` in the working directory or `~/.config/lawyerr/lawyerr.toml`:
 
 ```toml
-[dgsi]
-courts = ["stj", "sta", "rel-porto", "rel-lisboa"]
-
-[dr]
-content_types = ["atos-1", "atos-2", "decisoes"]
-
 [http]
 delay_ms = 100
 max_concurrent = 10

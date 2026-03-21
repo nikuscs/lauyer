@@ -290,7 +290,7 @@ async fn dr_search(
 
     // Resolve content types
     let content_aliases: Vec<String> = params.content.as_deref().map_or_else(
-        || state.config.dr.content_types.clone(),
+        || vec!["atos-1".to_owned()],
         |c| c.split(',').map(|s| s.trim().to_owned()).filter(|s| !s.is_empty()).collect(),
     );
 
@@ -366,8 +366,7 @@ async fn dr_today(
     let client = HttpClient::new(None, 30, 3).map_err(AppError)?;
     let session = dr::DrSession::new(client).await.map_err(AppError)?;
 
-    let content_types =
-        dr::resolve_content_types(&state.config.dr.content_types).map_err(AppError)?;
+    let content_types = dr::resolve_content_types(&[String::from("atos-1")]).map_err(AppError)?;
 
     let mut act_types = Vec::new();
     if let Some(ref type_str) = params.act_type {
