@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::fmt;
 use std::fmt::Write as _;
 use std::io::Write as IoWrite;

@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 /// Collapse multiple consecutive blank lines into one, strip leading/trailing
 /// whitespace per line, remove residual HTML tags, and collapse internal runs
 /// of whitespace to a single space.
