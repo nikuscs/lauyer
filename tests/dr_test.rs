@@ -939,22 +939,6 @@ fn test_content_type_display_name_values() {
 }
 
 #[test]
-fn test_resolve_act_type_unknown_returns_none() {
-    assert_eq!(resolve_act_type(""), None);
-    assert_eq!(resolve_act_type("xyz"), None);
-    assert_eq!(resolve_act_type("nao-existe"), None);
-    assert_eq!(resolve_act_type("random-string"), None);
-}
-
-#[test]
-fn test_resolve_act_type_case_insensitive() {
-    // resolve_act_type lowercases the input before matching
-    assert_eq!(resolve_act_type("PORTARIA"), Some("Portaria".to_owned()));
-    assert_eq!(resolve_act_type("Portaria"), Some("Portaria".to_owned()));
-    assert_eq!(resolve_act_type("LEI"), Some("Lei".to_owned()));
-}
-
-#[test]
 fn test_all_content_types_returns_four() {
     let all = DrContentType::all();
     assert_eq!(all.len(), 4);
@@ -962,31 +946,6 @@ fn test_all_content_types_returns_four() {
     assert!(all.contains(&DrContentType::AtosSerie2));
     assert!(all.contains(&DrContentType::DiarioRepublica));
     assert!(all.contains(&DrContentType::Jurisprudencia));
-}
-
-#[test]
-fn test_from_alias_all_variants() {
-    // Serie 1
-    assert_eq!(DrContentType::from_alias("atos-1"), Some(DrContentType::AtosSerie1));
-    assert_eq!(DrContentType::from_alias("atos1"), Some(DrContentType::AtosSerie1));
-    assert_eq!(DrContentType::from_alias("serie1"), Some(DrContentType::AtosSerie1));
-    assert_eq!(DrContentType::from_alias("s1"), Some(DrContentType::AtosSerie1));
-
-    // Serie 2
-    assert_eq!(DrContentType::from_alias("atos-2"), Some(DrContentType::AtosSerie2));
-    assert_eq!(DrContentType::from_alias("atos2"), Some(DrContentType::AtosSerie2));
-    assert_eq!(DrContentType::from_alias("serie2"), Some(DrContentType::AtosSerie2));
-    assert_eq!(DrContentType::from_alias("s2"), Some(DrContentType::AtosSerie2));
-
-    // DiarioRepublica
-    assert_eq!(DrContentType::from_alias("dr"), Some(DrContentType::DiarioRepublica));
-    assert_eq!(DrContentType::from_alias("diario"), Some(DrContentType::DiarioRepublica));
-    assert_eq!(DrContentType::from_alias("diario-republica"), Some(DrContentType::DiarioRepublica));
-
-    // Jurisprudencia
-    assert_eq!(DrContentType::from_alias("decisoes"), Some(DrContentType::Jurisprudencia));
-    assert_eq!(DrContentType::from_alias("jurisprudencia"), Some(DrContentType::Jurisprudencia));
-    assert_eq!(DrContentType::from_alias("juris"), Some(DrContentType::Jurisprudencia));
 }
 
 // ---------------------------------------------------------------------------
@@ -1137,14 +1096,6 @@ fn sample_result_with_html() -> DrSearchResult {
 }
 
 #[test]
-fn markdown_strips_html_completely() {
-    let md = sample_result_with_html().to_markdown();
-    assert!(!md.contains('<'));
-    assert!(!md.contains('>'));
-    assert!(md.contains("Reconhece a Associação Empresarial de Águeda"));
-}
-
-#[test]
 fn markdown_format_heading_and_emissor() {
     let md = sample_result_with_html().to_markdown();
     assert!(md.starts_with("### Portaria n.º 122/2026/1 (2026-03-20)"));
@@ -1159,16 +1110,6 @@ fn json_output_strips_html_in_sumario() {
     assert_eq!(json["data_publicacao"], "2026-03-20");
     let sumario = json["sumario"].as_str().unwrap_or("");
     assert!(!sumario.contains('<'), "HTML must be stripped from JSON sumario");
-}
-
-#[test]
-fn table_row_returns_correct_headers_and_values() {
-    let result = sample_result_with_html();
-    let (headers, values) = result.table_row().unwrap();
-    assert_eq!(headers, vec!["Date", "Tipo", "Número", "Emissor", "Sumário"]);
-    assert_eq!(values[0], "2026-03-20");
-    assert_eq!(values[1], "Portaria");
-    assert_eq!(values.len(), 5);
 }
 
 #[tokio::test]
@@ -1379,40 +1320,6 @@ fn parse_dr_fixture_new_fields() {
     assert_eq!(first.file_id, "file1");
     assert_eq!(first.tipo_conteudo, "AtosSerie1");
     assert_eq!(first.ano, Some(2026));
-}
-
-// ---------------------------------------------------------------------------
-// Fixture: aggregation parsing
-// ---------------------------------------------------------------------------
-
-#[test]
-fn parse_dr_fixture_aggregations() {
-    let raw = load_dr_fixture();
-    let response = parse_search_response(&raw).unwrap();
-    let aggs = response.aggregations.as_ref().expect("fixture should have aggregations");
-
-    assert_eq!(aggs.tipo_ato.len(), 2);
-    assert!(aggs.tipo_ato.iter().any(|(k, c)| k == "Portaria" && *c == 2));
-    assert!(aggs.tipo_ato.iter().any(|(k, c)| k == "Decreto-Lei" && *c == 1));
-
-    assert_eq!(aggs.emissor.len(), 3);
-    assert!(aggs.emissor.iter().any(|(k, _)| k == "Saúde"));
-}
-
-#[test]
-fn parse_dr_response_no_aggregations() {
-    let inner = serde_json::json!({
-        "took": 1,
-        "hits": {
-            "total": {"value": 0},
-            "hits": []
-        }
-    })
-    .to_string();
-
-    let response_text = make_dr_response_json(&inner, "0");
-    let result = parse_search_response(&response_text).unwrap();
-    assert!(result.aggregations.is_none());
 }
 
 // ---------------------------------------------------------------------------

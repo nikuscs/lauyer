@@ -91,11 +91,6 @@ struct CourtInfo {
     name: String,
 }
 
-#[derive(Serialize)]
-struct ErrorBody {
-    error: String,
-}
-
 // ---------------------------------------------------------------------------
 // Handlers
 // ---------------------------------------------------------------------------
@@ -222,8 +217,9 @@ async fn dgsi_search(
 
     let source = if source_parts.is_empty() { "DGSI".to_owned() } else { source_parts.join(", ") };
 
+    let strip_sw = state.config.output.strip_stopwords;
     let response = SearchResponse { source, query, total, results: all_renderables };
-    let rendered = format::render(&response, &fmt, compact, false);
+    let rendered = format::render(&response, &fmt, compact, strip_sw);
 
     Ok(format_response(&rendered, &fmt))
 }
@@ -235,6 +231,7 @@ async fn dgsi_fetch(
     let compact = params.compact.unwrap_or(state.config.output.compact);
     let fmt = parse_output_format(params.format.as_deref());
 
+    let strip_sw = state.config.output.strip_stopwords;
     let decision = dgsi::fetch_full_decision(&state.http_client, &params.url).await?;
     let response = SearchResponse {
         source: "DGSI".to_owned(),
@@ -242,7 +239,7 @@ async fn dgsi_fetch(
         total: 1,
         results: vec![Box::new(decision)],
     };
-    let rendered = format::render(&response, &fmt, compact, false);
+    let rendered = format::render(&response, &fmt, compact, strip_sw);
 
     Ok(format_response(&rendered, &fmt))
 }
@@ -285,7 +282,12 @@ async fn dr_search(
     State(state): State<Arc<AppState>>,
     Query(params): Query<DrSearchQueryParams>,
 ) -> Result<Response, AppError> {
-    let client = HttpClient::new(None, 30, 3).map_err(AppError)?;
+    let client = HttpClient::new(
+        state.config.http.proxy.as_deref(),
+        state.config.http.timeout_secs,
+        state.config.http.retries,
+    )
+    .map_err(AppError)?;
     let session = dr::DrSession::new(client).await.map_err(AppError)?;
 
     // Resolve content types
@@ -348,13 +350,14 @@ async fn dr_search(
     let renderables: Vec<Box<dyn Renderable>> =
         response.results.into_iter().map(|r| Box::new(r) as Box<dyn Renderable>).collect();
 
+    let strip_sw = state.config.output.strip_stopwords;
     let search_response = SearchResponse {
         source: "Diário da República".to_owned(),
         query: search_params.query,
         total: response.total,
         results: renderables,
     };
-    let rendered = format::render(&search_response, &fmt, compact, false);
+    let rendered = format::render(&search_response, &fmt, compact, strip_sw);
 
     Ok(format_response(&rendered, &fmt))
 }
@@ -363,7 +366,12 @@ async fn dr_today(
     State(state): State<Arc<AppState>>,
     Query(params): Query<DrTodayQueryParams>,
 ) -> Result<Response, AppError> {
-    let client = HttpClient::new(None, 30, 3).map_err(AppError)?;
+    let client = HttpClient::new(
+        state.config.http.proxy.as_deref(),
+        state.config.http.timeout_secs,
+        state.config.http.retries,
+    )
+    .map_err(AppError)?;
     let session = dr::DrSession::new(client).await.map_err(AppError)?;
 
     let content_types = dr::resolve_content_types(&[String::from("atos-1")]).map_err(AppError)?;
@@ -399,13 +407,14 @@ async fn dr_today(
     let renderables: Vec<Box<dyn Renderable>> =
         response.results.into_iter().map(|r| Box::new(r) as Box<dyn Renderable>).collect();
 
+    let strip_sw = state.config.output.strip_stopwords;
     let search_response = SearchResponse {
         source: "Diário da República — Today".to_owned(),
         query: String::new(),
         total: response.total,
         results: renderables,
     };
-    let rendered = format::render(&search_response, &fmt, compact, false);
+    let rendered = format::render(&search_response, &fmt, compact, strip_sw);
 
     Ok(format_response(&rendered, &fmt))
 }
@@ -428,15 +437,6 @@ async fn dr_types(Query(params): Query<DrTypesQueryParams>) -> Response {
         (StatusCode::OK, [(axum::http::header::CONTENT_TYPE, "text/markdown; charset=utf-8")], out)
             .into_response()
     }
-}
-
-async fn dr_fetch_stub() -> (StatusCode, Json<ErrorBody>) {
-    (
-        StatusCode::NOT_IMPLEMENTED,
-        Json(ErrorBody {
-            error: "DR fetch not implemented yet — individual document fetching is complex and low priority".to_owned(),
-        }),
-    )
 }
 
 // ---------------------------------------------------------------------------
@@ -481,7 +481,6 @@ fn build_router(state: Arc<AppState>) -> Router {
         .route("/dr/search", get(dr_search))
         .route("/dr/today", get(dr_today))
         .route("/dr/types", get(dr_types))
-        .route("/dr/fetch", get(dr_fetch_stub))
         .with_state(state)
 }
 

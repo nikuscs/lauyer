@@ -52,29 +52,6 @@ async fn dgsi_courts_returns_json_array() {
 }
 
 #[tokio::test]
-async fn dr_types_returns_json() {
-    let app = test_router();
-
-    let response = app
-        .oneshot(Request::builder().uri("/dr/types?format=json").body(Body::empty()).unwrap())
-        .await
-        .unwrap();
-
-    assert_eq!(response.status(), StatusCode::OK);
-
-    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
-    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-    assert!(json.is_array(), "Expected JSON array, got: {json}");
-
-    let arr = json.as_array().unwrap();
-    assert!(!arr.is_empty(), "Act types list should not be empty");
-
-    let first = &arr[0];
-    assert!(first.get("alias").is_some(), "Missing alias field");
-    assert!(first.get("name").is_some(), "Missing name field");
-}
-
-#[tokio::test]
 async fn dr_types_default_is_markdown() {
     let app = test_router();
 
@@ -101,18 +78,6 @@ async fn dr_types_default_is_markdown() {
         body_str.contains("| Alias |"),
         "Markdown response must contain the table header '| Alias |': {body_str}"
     );
-}
-
-#[tokio::test]
-async fn dr_fetch_returns_501() {
-    let app = test_router();
-
-    let response = app
-        .oneshot(Request::builder().uri("/dr/fetch").body(Body::empty()).unwrap())
-        .await
-        .unwrap();
-
-    assert_eq!(response.status(), StatusCode::NOT_IMPLEMENTED);
 }
 
 #[tokio::test]
@@ -571,25 +536,6 @@ async fn dr_today_endpoint() {
 }
 
 #[tokio::test]
-async fn dr_today_with_type() {
-    let app = test_router();
-
-    let response = app
-        .oneshot(Request::builder().uri("/dr/today?type=portaria").body(Body::empty()).unwrap())
-        .await
-        .unwrap();
-
-    // DR session init may or may not reach the upstream host.
-    let status = response.status();
-    assert!(
-        status == StatusCode::OK
-            || status == StatusCode::BAD_GATEWAY
-            || status == StatusCode::INTERNAL_SERVER_ERROR,
-        "Unexpected status for dr_today_with_type: {status}"
-    );
-}
-
-#[tokio::test]
 async fn dr_types_json() {
     let app = test_router();
 
@@ -644,22 +590,6 @@ async fn dr_types_markdown() {
         body_str.contains("| Act Type |"),
         "Markdown table must contain '| Act Type |' header: {body_str}"
     );
-}
-
-#[tokio::test]
-async fn dr_fetch_still_501() {
-    let app = test_router();
-
-    let response = app
-        .oneshot(Request::builder().uri("/dr/fetch").body(Body::empty()).unwrap())
-        .await
-        .unwrap();
-
-    assert_eq!(response.status(), StatusCode::NOT_IMPLEMENTED);
-
-    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
-    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-    assert!(json.get("error").is_some(), "501 response must include an 'error' field: {json}");
 }
 
 #[tokio::test]

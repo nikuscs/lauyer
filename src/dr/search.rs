@@ -44,19 +44,11 @@ pub struct DrSearchResult {
     pub ano: Option<u32>,
 }
 
-/// Aggregation buckets from the ES response.
-#[derive(Debug, Clone)]
-pub struct DrAggregations {
-    pub tipo_ato: Vec<(String, u64)>,
-    pub emissor: Vec<(String, u64)>,
-}
-
 /// Aggregate search response.
 #[derive(Debug)]
 pub struct DrSearchResponse {
     pub total: u64,
     pub results: Vec<DrSearchResult>,
-    pub aggregations: Option<DrAggregations>,
 }
 
 // ---------------------------------------------------------------------------
@@ -410,11 +402,9 @@ pub fn parse_search_response(response_text: &str) -> Result<DrSearchResponse> {
 
     let results: Vec<DrSearchResult> = hits.iter().filter_map(parse_hit).collect();
 
-    let aggregations = parse_aggregations(&es_results);
-
     info!(total, result_count = results.len(), "DR search results parsed");
 
-    Ok(DrSearchResponse { total, results, aggregations })
+    Ok(DrSearchResponse { total, results })
 }
 
 /// Parse a single ES hit `_source` into a `DrSearchResult`.
@@ -443,32 +433,5 @@ fn parse_hit(hit: &Value) -> Option<DrSearchResult> {
         file_id: get_str("fileId"),
         tipo_conteudo: get_str("tipoConteudo"),
         ano,
-    })
-}
-
-/// Parse aggregation buckets from the ES response.
-fn parse_aggregations(es_results: &Value) -> Option<DrAggregations> {
-    let aggs = es_results.get("aggregations")?;
-
-    let parse_buckets = |key: &str| -> Vec<(String, u64)> {
-        aggs.get(key)
-            .and_then(|v| v.get("buckets"))
-            .and_then(Value::as_array)
-            .map(|buckets| {
-                buckets
-                    .iter()
-                    .filter_map(|b| {
-                        let k = b.get("key").and_then(Value::as_str)?.to_owned();
-                        let count = b.get("doc_count").and_then(Value::as_u64).unwrap_or(0);
-                        Some((k, count))
-                    })
-                    .collect()
-            })
-            .unwrap_or_default()
-    };
-
-    Some(DrAggregations {
-        tipo_ato: parse_buckets("TipoAtoAgg"),
-        emissor: parse_buckets("EmissorAgg"),
     })
 }

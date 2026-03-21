@@ -69,6 +69,4 @@ cargo build --release         # Release build (LTO, stripped)
 
 ## Reference
 
-- `docs/plans/initial.md` — Full API details, HTML structures, validated test results
-- `docs/plans/phase1-core.md` — Phase 1 implementation checklist
-- `docs/dr_request_template.json` — Complete ~30KB POST body template for DR search
+- `docs/real-world-test.md` — Real-world test scenarios and results

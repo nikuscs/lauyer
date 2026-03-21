@@ -7,12 +7,6 @@ use crate::format::OutputFormat;
 // Sub-configurations
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Default, Deserialize)]
-pub struct DgsiConfig {}
-
-#[derive(Debug, Default, Deserialize)]
-pub struct DrConfig {}
-
 const fn default_delay_ms() -> u64 {
     100
 }
@@ -109,12 +103,6 @@ impl Default for ServerConfig {
 
 #[derive(Debug, Default, Deserialize)]
 pub struct Config {
-    #[serde(default)]
-    pub dgsi: DgsiConfig,
-
-    #[serde(default)]
-    pub dr: DrConfig,
-
     #[serde(default)]
     pub http: HttpConfig,
 

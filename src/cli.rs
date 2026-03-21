@@ -130,11 +130,6 @@ pub struct DgsiSearchArgs {
 pub enum DrCommands {
     /// Search Diário da República acts
     Search(DrSearchArgs),
-    /// Fetch a single act by URL
-    Fetch {
-        /// URL of the act to fetch
-        url: String,
-    },
     /// Show acts published today
     Today(DrTodayArgs),
     /// List available act types

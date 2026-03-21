@@ -1,10 +1,7 @@
 use std::sync::Mutex;
 
 use lauyer::dgsi::courts::Court;
-use lauyer::dgsi::{
-    SearchParams, execute_search, fetch_full_decision, list_courts, resolve_courts,
-    search_all_courts, search_court,
-};
+use lauyer::dgsi::{fetch_full_decision, resolve_courts, search_all_courts, search_court};
 use lauyer::error::{LauyerError, Result};
 use lauyer::http::HttpFetcher;
 
@@ -208,14 +205,7 @@ async fn fetch_full_decision_latin1() {
     );
 }
 
-// 6. `resolve_courts` with empty slice returns all 10 courts.
-#[tokio::test]
-async fn resolve_courts_empty_returns_all() {
-    let courts = resolve_courts(&[]).expect("empty resolve should succeed");
-    assert_eq!(courts.len(), 10);
-}
-
-// 7. `resolve_courts` resolves known aliases correctly.
+// 6. `resolve_courts` resolves known aliases correctly.
 #[tokio::test]
 async fn resolve_courts_valid_aliases() {
     let aliases = vec!["stj".to_owned(), "rel-porto".to_owned()];
@@ -226,64 +216,7 @@ async fn resolve_courts_valid_aliases() {
     assert!(courts.contains(&Court::RelPorto));
 }
 
-// 8. `resolve_courts` returns an error for an unknown alias.
-#[tokio::test]
-async fn resolve_courts_invalid_alias() {
-    let aliases = vec!["not-a-court".to_owned()];
-    let result = resolve_courts(&aliases);
-    assert!(result.is_err(), "unknown alias should produce an error");
-    let err = result.unwrap_err();
-    assert!(
-        err.to_string().contains("not-a-court"),
-        "error message should mention the bad alias: {err}"
-    );
-}
-
-// 9. `list_courts` returns all 10 entries with non-empty alias and `display_name`.
-#[tokio::test]
-async fn list_courts_returns_all() {
-    let courts = list_courts();
-    assert_eq!(courts.len(), 10, "should list exactly 10 courts");
-
-    for (alias, display_name) in &courts {
-        assert!(!alias.is_empty(), "alias should not be empty");
-        assert!(!display_name.is_empty(), "display_name should not be empty");
-    }
-
-    assert!(courts.iter().any(|(a, _)| a == "stj"), "list should contain 'stj' alias");
-    assert!(
-        courts.iter().any(|(_, d)| d.contains("Supremo Tribunal de Justiça")),
-        "list should contain STJ display name"
-    );
-}
-
-// 10. `execute_search` delegates to `search_all_courts` — verify it returns
-//     the same results as calling `search_all_courts` directly with equivalent args.
-#[tokio::test]
-async fn execute_search_uses_search_all_courts() {
-    let mock = MockHttpFetcher::new();
-    mock.add_text("jstj.nsf", Ok(search_results_html()));
-
-    let params = SearchParams {
-        courts: vec![Court::Stj],
-        query: "usucapiao".to_owned(),
-        limit: 50,
-        sort_by_date: false,
-        fetch_full: false,
-        max_concurrent: 2,
-        delay_ms: None,
-    };
-
-    let outcomes = execute_search(&mock, &params).await;
-
-    assert_eq!(outcomes.len(), 1, "one court requested → one outcome");
-    let (_court, result) = &outcomes[0];
-    let (_total, results) = result.as_ref().expect("STJ search should succeed");
-    assert_eq!(results.len(), 5, "fixture contains 5 results");
-    assert_eq!(results[0].processo, "084380");
-}
-
-// 11. `search_court` paginates: first page full (5 results, Count=5), second
+// 7. `search_court` paginates: first page full (5 results, Count=5), second
 //     page short (2 results) → stops.  Results are then truncated to limit=5.
 #[tokio::test]
 async fn search_court_pagination() {

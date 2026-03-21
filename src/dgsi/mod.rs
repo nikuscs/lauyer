@@ -152,36 +152,3 @@ pub fn resolve_courts(aliases: &[String]) -> Result<Vec<Court>> {
 pub fn list_courts() -> Vec<(String, String)> {
     Court::all().iter().map(|c| (c.alias().to_owned(), c.display_name().to_owned())).collect()
 }
-
-// ---------------------------------------------------------------------------
-// Shared search service
-// ---------------------------------------------------------------------------
-
-/// Parameters for executing a DGSI search across one or more courts.
-pub struct SearchParams {
-    pub courts: Vec<Court>,
-    pub query: String,
-    pub limit: u32,
-    pub sort_by_date: bool,
-    pub fetch_full: bool,
-    pub max_concurrent: usize,
-    pub delay_ms: Option<u64>,
-}
-
-/// Execute a DGSI search across the specified courts.
-/// Results are returned in the same order as the input courts.
-pub async fn execute_search(
-    fetcher: &dyn HttpFetcher,
-    params: &SearchParams,
-) -> Vec<(Court, Result<(u64, Vec<DgsiSearchResult>)>)> {
-    search_all_courts(
-        fetcher,
-        &params.courts,
-        &params.query,
-        params.limit,
-        params.sort_by_date,
-        params.max_concurrent,
-        params.delay_ms,
-    )
-    .await
-}

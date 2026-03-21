@@ -12,6 +12,7 @@ use lauyer::{cli, config, dgsi, dr, format, http, server};
 #[allow(clippy::too_many_lines, clippy::literal_string_with_formatting_args)]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
+        .with_writer(std::io::stderr)
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
                 .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
@@ -21,8 +22,8 @@ async fn main() -> anyhow::Result<()> {
     let cli = cli::Cli::parse();
     let cfg = config::load_config(cli.config.as_deref())?;
 
-    let compact = !cli.no_compact;
-    let strip_sw = cli.strip_stopwords;
+    let compact = if cli.no_compact { false } else { cfg.output.compact };
+    let strip_sw = cli.strip_stopwords || cfg.output.strip_stopwords;
     let output_path = cli.output.as_deref();
     let quiet = cli.quiet;
 
@@ -476,12 +477,6 @@ async fn main() -> anyhow::Result<()> {
                     md
                 };
                 format::write_output(&out, output_path)?;
-            }
-
-            cli::DrCommands::Fetch { .. } => {
-                anyhow::bail!(
-                    "DR fetch not implemented yet — individual document fetching is complex and low priority"
-                );
             }
         },
 
