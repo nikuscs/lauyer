@@ -129,6 +129,9 @@ fn make_dr_search_result() -> DrSearchResult {
         sumario: "Reconhece a Associação Empresarial de Águeda".to_owned(),
         serie: "I".to_owned(),
         db_id: "abc123".to_owned(),
+        file_id: "file1".to_owned(),
+        tipo_conteudo: "AtosSerie1".to_owned(),
+        ano: Some(2026),
     }
 }
 
@@ -164,11 +167,12 @@ fn dr_search_result_table_row() {
     let r = make_dr_search_result();
     let (headers, values) = r.table_row().expect("table_row must return Some");
 
-    assert_eq!(headers, vec!["Date", "Tipo", "Número", "Emissor"]);
+    assert_eq!(headers, vec!["Date", "Tipo", "Número", "Emissor", "Sumário"]);
     assert_eq!(values[0], "2026-03-20");
     assert_eq!(values[1], "Portaria");
     assert_eq!(values[2], "122/2026/1");
     assert_eq!(values[3], "Economia e Coesão Territorial");
+    assert_eq!(values[4], "Reconhece a Associação Empresarial de Águeda");
 }
 
 // ---------------------------------------------------------------------------
@@ -219,6 +223,7 @@ async fn live_dr_search_portarias() {
         content_types: vec![lawyerr::dr::DrContentType::AtosSerie1],
         query: String::new(),
         act_types: vec!["Portaria".to_owned()],
+        series: vec![],
         since: Some(chrono::Local::now().date_naive() - chrono::Duration::weeks(1)),
         until: Some(chrono::Local::now().date_naive()),
         limit: 5,
@@ -237,6 +242,7 @@ fn base_params() -> DrSearchParams {
         content_types: vec![DrContentType::AtosSerie1],
         query: String::new(),
         act_types: vec![],
+        series: vec![],
         since: None,
         until: None,
         limit: 25,
@@ -296,6 +302,7 @@ fn test_build_pesquisa_cookie_with_dates() {
         content_types: vec![DrContentType::AtosSerie1],
         query: String::new(),
         act_types: vec![],
+        series: vec![],
         since: NaiveDate::from_ymd_opt(2026, 1, 15),
         until: NaiveDate::from_ymd_opt(2026, 3, 21),
         limit: 25,
@@ -337,6 +344,7 @@ fn test_build_pesquisa_cookie_with_act_types() {
         content_types: vec![DrContentType::AtosSerie1],
         query: String::new(),
         act_types: vec!["Portaria".to_owned(), "Lei".to_owned()],
+        series: vec![],
         since: None,
         until: None,
         limit: 25,
@@ -362,6 +370,7 @@ fn test_build_pesquisa_cookie_with_query_bools_correct() {
         content_types: vec![DrContentType::AtosSerie1],
         query: "trabalho".to_owned(),
         act_types: vec![],
+        series: vec![],
         since: None,
         until: None,
         limit: 25,
@@ -382,6 +391,7 @@ fn test_build_pesquisa_cookie_multiple_content_types() {
         content_types: vec![DrContentType::AtosSerie1, DrContentType::AtosSerie2],
         query: String::new(),
         act_types: vec![],
+        series: vec![],
         since: None,
         until: None,
         limit: 25,
@@ -885,6 +895,7 @@ fn search_params_atos1() -> DrSearchParams {
         content_types: vec![DrContentType::AtosSerie1],
         query: String::new(),
         act_types: vec![],
+        series: vec![],
         since: None,
         until: None,
         limit: 25,
@@ -906,6 +917,7 @@ fn build_cookie_filtros_compact_json() {
         content_types: vec![DrContentType::AtosSerie1],
         query: String::new(),
         act_types: vec!["Portaria".to_owned()],
+        series: vec![],
         since: NaiveDate::from_ymd_opt(2026, 3, 14),
         until: NaiveDate::from_ymd_opt(2026, 3, 21),
         limit: 25,
@@ -924,6 +936,7 @@ fn build_body_filtros_uses_outsystems_format() {
         content_types: vec![DrContentType::AtosSerie1],
         query: "trabalho".to_owned(),
         act_types: vec!["Portaria".to_owned()],
+        series: vec![],
         since: None,
         until: None,
         limit: 25,
@@ -950,6 +963,9 @@ fn sample_result_with_html() -> DrSearchResult {
         sumario: "<p>Reconhece a <a href=\"#\">Associação</a> Empresarial de Águeda</p>".to_owned(),
         serie: "I".to_owned(),
         db_id: "42".to_owned(),
+        file_id: "file42".to_owned(),
+        tipo_conteudo: "AtosSerie1".to_owned(),
+        ano: Some(2026),
     }
 }
 
@@ -982,9 +998,10 @@ fn json_output_strips_html_in_sumario() {
 fn table_row_returns_correct_headers_and_values() {
     let result = sample_result_with_html();
     let (headers, values) = result.table_row().unwrap();
-    assert_eq!(headers, vec!["Date", "Tipo", "Número", "Emissor"]);
+    assert_eq!(headers, vec!["Date", "Tipo", "Número", "Emissor", "Sumário"]);
     assert_eq!(values[0], "2026-03-20");
     assert_eq!(values[1], "Portaria");
+    assert_eq!(values.len(), 5);
 }
 
 #[tokio::test]
@@ -1050,6 +1067,7 @@ async fn test_build_search_body_with_mocked_session() {
         content_types: vec![DrContentType::AtosSerie1],
         query: "segurança social".to_owned(),
         act_types: vec!["Portaria".to_owned()],
+        series: vec![],
         since: NaiveDate::from_ymd_opt(2026, 1, 1),
         until: NaiveDate::from_ymd_opt(2026, 3, 21),
         limit: 10,
@@ -1174,9 +1192,100 @@ fn parse_dr_fixture_table_rows() {
     let response = parse_search_response(&raw).unwrap();
     for result in &response.results {
         let (headers, values) = result.table_row().expect("table_row should return data");
-        assert_eq!(headers.len(), 4);
-        assert_eq!(values.len(), 4);
+        assert_eq!(headers.len(), 5);
+        assert_eq!(values.len(), 5);
         assert_eq!(headers[0], "Date");
         assert_eq!(headers[1], "Tipo");
+        assert_eq!(headers[4], "Sumário");
     }
+}
+
+// ---------------------------------------------------------------------------
+// Fixture: new fields (file_id, tipo_conteudo, ano)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn parse_dr_fixture_new_fields() {
+    let raw = load_dr_fixture();
+    let response = parse_search_response(&raw).unwrap();
+    let first = &response.results[0];
+    assert_eq!(first.file_id, "file1");
+    assert_eq!(first.tipo_conteudo, "AtosSerie1");
+    assert_eq!(first.ano, Some(2026));
+}
+
+// ---------------------------------------------------------------------------
+// Fixture: aggregation parsing
+// ---------------------------------------------------------------------------
+
+#[test]
+fn parse_dr_fixture_aggregations() {
+    let raw = load_dr_fixture();
+    let response = parse_search_response(&raw).unwrap();
+    let aggs = response.aggregations.as_ref().expect("fixture should have aggregations");
+
+    assert_eq!(aggs.tipo_ato.len(), 2);
+    assert!(aggs.tipo_ato.iter().any(|(k, c)| k == "Portaria" && *c == 2));
+    assert!(aggs.tipo_ato.iter().any(|(k, c)| k == "Decreto-Lei" && *c == 1));
+
+    assert_eq!(aggs.emissor.len(), 3);
+    assert!(aggs.emissor.iter().any(|(k, _)| k == "Saúde"));
+}
+
+#[test]
+fn parse_dr_response_no_aggregations() {
+    let inner = serde_json::json!({
+        "took": 1,
+        "hits": {
+            "total": {"value": 0},
+            "hits": []
+        }
+    })
+    .to_string();
+
+    let response_text = make_dr_response_json(&inner, "0");
+    let result = parse_search_response(&response_text).unwrap();
+    assert!(result.aggregations.is_none());
+}
+
+// ---------------------------------------------------------------------------
+// Integration tests — series 2 and text query (require network)
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+#[ignore = "requires network access to diariodarepublica.pt"]
+async fn live_dr_search_atos_serie2() {
+    let client = lawyerr::http::HttpClient::new(None, 30, 3).unwrap();
+    let session = lawyerr::dr::DrSession::new(client).await.unwrap();
+    let params = lawyerr::dr::DrSearchParams {
+        content_types: vec![lawyerr::dr::DrContentType::AtosSerie2],
+        query: String::new(),
+        act_types: vec!["Despacho".to_owned()],
+        series: vec![],
+        since: Some(chrono::Local::now().date_naive() - chrono::Duration::weeks(1)),
+        until: Some(chrono::Local::now().date_naive()),
+        limit: 5,
+    };
+    let response = lawyerr::dr::search(&session, &params).await.unwrap();
+    assert!(response.total > 0);
+    assert!(!response.results.is_empty());
+}
+
+#[tokio::test]
+#[ignore = "requires network access to diariodarepublica.pt"]
+async fn live_dr_search_text_query() {
+    let client = lawyerr::http::HttpClient::new(None, 30, 3).unwrap();
+    let session = lawyerr::dr::DrSession::new(client).await.unwrap();
+    let params = lawyerr::dr::DrSearchParams {
+        content_types: vec![lawyerr::dr::DrContentType::AtosSerie1],
+        query: "trabalho".to_owned(),
+        act_types: vec![],
+        series: vec![],
+        since: Some(chrono::Local::now().date_naive() - chrono::Duration::days(30)),
+        until: Some(chrono::Local::now().date_naive()),
+        limit: 5,
+    };
+    let response = lawyerr::dr::search(&session, &params).await.unwrap();
+    assert!(response.total > 0);
+    assert!(!response.results.is_empty());
 }

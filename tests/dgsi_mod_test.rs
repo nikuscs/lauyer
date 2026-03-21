@@ -125,7 +125,7 @@ async fn search_court_single_page() {
     let mock = MockHttpFetcher::new();
     mock.add_text("jstj.nsf", Ok(search_results_html()));
 
-    let (total, results) = search_court(&mock, Court::Stj, "usucapiao", 50, false)
+    let (total, results) = search_court(&mock, Court::Stj, "usucapiao", 50, false, None)
         .await
         .expect("search_court should succeed");
 
@@ -142,7 +142,7 @@ async fn search_court_respects_limit() {
     let mock = MockHttpFetcher::new();
     mock.add_text("jstj.nsf", Ok(search_results_html()));
 
-    let (total, results) = search_court(&mock, Court::Stj, "usucapiao", 2, false)
+    let (total, results) = search_court(&mock, Court::Stj, "usucapiao", 2, false, None)
         .await
         .expect("search_court should succeed");
 
@@ -158,7 +158,7 @@ async fn search_all_courts_multiple() {
     mock.add_text("jsta.nsf", Ok(search_results_html()));
 
     let courts = vec![Court::Stj, Court::Sta];
-    let outcomes = search_all_courts(&mock, &courts, "usucapiao", 50, false, 2).await;
+    let outcomes = search_all_courts(&mock, &courts, "usucapiao", 50, false, 2, None).await;
 
     assert_eq!(outcomes.len(), 2);
     for (_court, result) in &outcomes {
@@ -176,7 +176,7 @@ async fn search_all_courts_one_fails() {
     mock.add_text("jstj.nsf", Ok(search_results_html()));
 
     let courts = vec![Court::Stj, Court::Sta];
-    let outcomes = search_all_courts(&mock, &courts, "usucapiao", 50, false, 2).await;
+    let outcomes = search_all_courts(&mock, &courts, "usucapiao", 50, false, 2, None).await;
 
     assert_eq!(outcomes.len(), 2);
 
@@ -271,6 +271,7 @@ async fn execute_search_uses_search_all_courts() {
         sort_by_date: false,
         fetch_full: false,
         max_concurrent: 2,
+        delay_ms: None,
     };
 
     let outcomes = execute_search(&mock, &params).await;
@@ -297,7 +298,7 @@ async fn search_court_pagination() {
     // 5 results, so page_len(5) == page_size(5) → the loop continues with
     // Start=6.  The second response has only 2 entries, so page_len(2) <
     // page_size(5) → pagination stops.  Results are then truncated to limit=5.
-    let (total, results) = search_court(&mock, Court::Stj, "usucapiao", 5, false)
+    let (total, results) = search_court(&mock, Court::Stj, "usucapiao", 5, false, None)
         .await
         .expect("paginated search should succeed");
 

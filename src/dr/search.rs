@@ -18,6 +18,7 @@ pub struct DrSearchParams {
     pub content_types: Vec<DrContentType>,
     pub query: String,
     pub act_types: Vec<String>,
+    pub series: Vec<String>,
     pub since: Option<NaiveDate>,
     pub until: Option<NaiveDate>,
     pub limit: u32,
@@ -38,6 +39,16 @@ pub struct DrSearchResult {
     pub sumario: String,
     pub serie: String,
     pub db_id: String,
+    pub file_id: String,
+    pub tipo_conteudo: String,
+    pub ano: Option<u32>,
+}
+
+/// Aggregation buckets from the ES response.
+#[derive(Debug, Clone)]
+pub struct DrAggregations {
+    pub tipo_ato: Vec<(String, u64)>,
+    pub emissor: Vec<(String, u64)>,
 }
 
 /// Aggregate search response.
@@ -45,6 +56,7 @@ pub struct DrSearchResult {
 pub struct DrSearchResponse {
     pub total: u64,
     pub results: Vec<DrSearchResult>,
+    pub aggregations: Option<DrAggregations>,
 }
 
 // ---------------------------------------------------------------------------
@@ -88,7 +100,7 @@ pub fn build_cookie_filtros(params: &DrSearchParams) -> Value {
 
     let mut filtros = json!({
         "tipoConteudo": tipo_conteudo,
-        "serie": [],
+        "serie": params.series,
         "tipo": params.act_types,
         "emissor": [],
         "entidadeProponente": [],
@@ -226,6 +238,7 @@ pub fn build_body_filtros(params: &DrSearchParams) -> Value {
         .collect();
 
     let act_types: Vec<Value> = params.act_types.iter().map(|t| Value::String(t.clone())).collect();
+    let series: Vec<Value> = params.series.iter().map(|s| Value::String(s.clone())).collect();
 
     let since_str = params.since.map_or_else(String::new, |d| d.format("%Y-%m-%d").to_string());
     let until_str = params.until.map_or_else(String::new, |d| d.format("%Y-%m-%d").to_string());
@@ -235,7 +248,7 @@ pub fn build_body_filtros(params: &DrSearchParams) -> Value {
 
     let mut m = Map::new();
     m.insert("tipoConteudo".into(), json!({"List": tipo_conteudo}));
-    m.insert("serie".into(), json!({"List": []}));
+    m.insert("serie".into(), json!({"List": series}));
     m.insert("numero".into(), s(""));
     m.insert("ano".into(), s("0"));
     m.insert("suplemento".into(), s("0"));
@@ -397,9 +410,11 @@ pub fn parse_search_response(response_text: &str) -> Result<DrSearchResponse> {
 
     let results: Vec<DrSearchResult> = hits.iter().filter_map(parse_hit).collect();
 
+    let aggregations = parse_aggregations(&es_results);
+
     info!(total, result_count = results.len(), "DR search results parsed");
 
-    Ok(DrSearchResponse { total, results })
+    Ok(DrSearchResponse { total, results, aggregations })
 }
 
 /// Parse a single ES hit `_source` into a `DrSearchResult`.
@@ -414,6 +429,8 @@ fn parse_hit(hit: &Value) -> Option<DrSearchResult> {
         .and_then(Value::as_str)
         .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
 
+    let ano = source.get("ano").and_then(Value::as_u64).map(|v| v as u32);
+
     Some(DrSearchResult {
         title: get_str("title"),
         tipo: get_str("tipo"),
@@ -423,5 +440,35 @@ fn parse_hit(hit: &Value) -> Option<DrSearchResult> {
         sumario: get_str("sumario"),
         serie: get_str("serie"),
         db_id: get_str("dbId"),
+        file_id: get_str("fileId"),
+        tipo_conteudo: get_str("tipoConteudo"),
+        ano,
+    })
+}
+
+/// Parse aggregation buckets from the ES response.
+fn parse_aggregations(es_results: &Value) -> Option<DrAggregations> {
+    let aggs = es_results.get("aggregations")?;
+
+    let parse_buckets = |key: &str| -> Vec<(String, u64)> {
+        aggs.get(key)
+            .and_then(|v| v.get("buckets"))
+            .and_then(Value::as_array)
+            .map(|buckets| {
+                buckets
+                    .iter()
+                    .filter_map(|b| {
+                        let k = b.get("key").and_then(Value::as_str)?.to_owned();
+                        let count = b.get("doc_count").and_then(Value::as_u64).unwrap_or(0);
+                        Some((k, count))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+
+    Some(DrAggregations {
+        tipo_ato: parse_buckets("TipoAtoAgg"),
+        emissor: parse_buckets("EmissorAgg"),
     })
 }

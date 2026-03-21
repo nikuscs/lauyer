@@ -121,6 +121,50 @@ impl DrSession {
     pub const fn base_url() -> &'static str {
         BASE_URL
     }
+
+    /// Re-fetch module version and re-call the roles endpoint to refresh the
+    /// session. Uses the same logic as [`new_from_urls`] steps 1-2, without
+    /// re-parsing the embedded body template.
+    pub async fn refresh(&mut self) -> Result<()> {
+        // Step 1: re-fetch module version
+        let version_text = self.client.get_text(VERSION_INFO_URL).await.map_err(|e| {
+            tracing::warn!(error = %e, "Failed to fetch DR module version info during refresh");
+            e
+        })?;
+
+        let version_json: Value =
+            serde_json::from_str(&version_text).map_err(|e| LawyerrError::Parse {
+                message: format!("Failed to parse moduleversioninfo JSON: {e}"),
+                source_url: VERSION_INFO_URL.to_owned(),
+            })?;
+
+        let module_version = version_json
+            .get("versionToken")
+            .and_then(Value::as_str)
+            .ok_or_else(|| LawyerrError::Parse {
+                message: "Missing versionToken in moduleversioninfo response".to_owned(),
+                source_url: VERSION_INFO_URL.to_owned(),
+            })?
+            .to_owned();
+
+        info!(module_version = %module_version, "DR module version refreshed");
+
+        // Step 2: re-call roles endpoint to refresh session cookies
+        let _roles_response = self
+            .client
+            .inner()
+            .get(ROLES_URL)
+            .header("X-CSRFToken", CSRF_TOKEN)
+            .send()
+            .await
+            .map_err(|e| LawyerrError::Http { source: e, url: ROLES_URL.to_owned() })?;
+
+        info!("DR session cookies refreshed via roles endpoint");
+
+        self.module_version = module_version;
+
+        Ok(())
+    }
 }
 
 /// Recursively remove all keys named `_comment` from a JSON value.

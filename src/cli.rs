@@ -181,10 +181,10 @@ pub struct DrTodayArgs {
 #[derive(Args)]
 pub struct ServeArgs {
     /// Host address to bind to
-    #[arg(long, default_value = "0.0.0.0")]
+    #[arg(long, default_value = "0.0.0.0", env = "LAWYERR_HOST")]
     pub host: String,
 
     /// Port to listen on
-    #[arg(long, default_value_t = 3000)]
+    #[arg(long, default_value_t = 3000, env = "LAWYERR_PORT")]
     pub port: u16,
 }

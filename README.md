@@ -1,21 +1,38 @@
 # ⚖️ lawyerr
 
-![CI](https://github.com/nikuscs/lawyerr/actions/workflows/ci.yml/badge.svg)
+![CI](https://img.shields.io/github/actions/workflow/status/nikuscs/lawyerr/ci.yml?branch=main&label=CI)
 ![Release](https://img.shields.io/github/v/release/nikuscs/lawyerr)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
-**Fast Rust CLI for searching Portuguese court jurisprudence (DGSI) and legislation (Diário da República), optimized for LLM consumption.**
+Fast Rust CLI for searching Portuguese court jurisprudence (DGSI) and legislation (Diário da República), optimized for LLM consumption. Searches 10 courts in parallel, outputs clean markdown, and includes a REST API server mode.
 
-> **Disclaimer:** This project is for **educational purposes and AI automation research only**.
-> The authors are not responsible for any misuse or for any damages resulting from the use of this tool.
-> Users are solely responsible for ensuring compliance with applicable laws and the terms of service
-> of any websites accessed. This software is provided "as-is" without warranty of any kind.
->
-> If you are a rights holder and wish to have this project removed, please [contact me](https://github.com/nikuscs).
+## Quick start
 
-> **Note:** This project was partially developed with AI assistance and may contain bugs or unexpected behavior. Use at your own risk.
+Search all Portuguese courts for a term and get markdown output:
 
-Search court decisions across all 10 Portuguese DGSI courts in parallel and search legislation from Diário da República, with clean markdown output ready for LLM pipelines.
+```bash
+lawyerr dgsi search "usucapiao"
+```
+
+```markdown
+# Search Results: "usucapiao"
+
+## STJ — Supremo Tribunal de Justiça (12 results)
+
+### 1. Acórdão 1234/20.0T8LSB.L1.S1
+- **Date:** 2025-11-15
+- **Summary:** Usucapião sobre prédio rústico não demarcado...
+- **URL:** https://www.dgsi.pt/jstj.nsf/...
+
+## Relação de Lisboa (8 results)
+...
+```
+
+Search today's legislation:
+
+```bash
+lawyerr dr today
+```
 
 ## Why?
 
@@ -29,6 +46,8 @@ Search court decisions across all 10 Portuguese DGSI courts in parallel and sear
 
 ## Install
 
+### Binary
+
 ```bash
 # From source (requires Rust 1.85+)
 cargo install --git https://github.com/nikuscs/lawyerr
@@ -37,7 +56,10 @@ cargo install --git https://github.com/nikuscs/lawyerr
 git clone https://github.com/nikuscs/lawyerr
 cd lawyerr
 cargo build --release
+# Binary at target/release/lawyerr
 ```
+
+Pre-built binaries available in [Releases](https://github.com/nikuscs/lawyerr/releases).
 
 ## Usage
 
@@ -120,7 +142,7 @@ lawyerr dr today --type portaria
 lawyerr dr types
 ```
 
-**Act type aliases:** `portaria`, `lei`, `decreto-lei`, `despacho`, `decreto`, `aviso`, `resolucao` (Resolução do Conselho de Ministros), `retificacao`, `decreto-regulamentar`, `lei-organica`
+**Act type aliases:** `portaria`, `lei`, `decreto-lei`, `despacho`, `decreto`, `aviso`, `resolucao` (Resolucao do Conselho de Ministros), `retificacao`, `decreto-regulamentar`, `lei-organica`
 
 ### Output formats
 
@@ -212,15 +234,36 @@ docker build -t lawyerr .
 docker run -p 3000:3000 lawyerr serve
 ```
 
+## How It Works
+
+1. **DGSI** — constructs Lotus Domino FT search queries, fetches HTML tables from dgsi.pt, parses Latin-1 encoded responses, extracts structured decision metadata, and converts HTML to clean markdown
+2. **DR** — initializes an OutSystems session (CSRF token + cookies), builds a ~30KB typed POST body with base64-encoded search params, queries the ElasticSearch backend, and renders results as markdown
+3. **Compact mode** — post-processes markdown output to strip legal boilerplate, normalize whitespace, and optionally remove Portuguese stop words for minimal token usage
+4. **Server mode** — wraps both modules in an Axum HTTP server with shared state, exposing REST endpoints that mirror the CLI interface
+
 ## Roadmap
 
-- **DR document fetching** — individual document fetching from Diário da República (complex, low priority)
+- **DR document fetching** — individual document fetching from Diario da Republica (complex, low priority)
 
 ## Related Projects
 
-- [crauler](https://github.com/nikuscs/crauler) — Web crawler with proxy routing and HTML-to-Markdown
-- [amz-crawler](https://github.com/nikuscs/amz-crawler) — Amazon product crawler with TLS fingerprinting
+- [🕷️ crauler](https://github.com/nikuscs/crauler) — Web crawler with proxy routing and HTML-to-Markdown
+- [🦎 amz-crawler](https://github.com/nikuscs/amz-crawler) — Amazon product crawler with TLS fingerprinting
+- [🕹️ scrauper](https://github.com/nikuscs/scrauper) — Multi-threaded ScreenScraper.fr scraper for ES-DE
+- [⚖️ kante-kusta](https://github.com/nikuscs/kante-kusta) — KuantoKusta.pt price comparison CLI
+- [🕵️ olx-tracker](https://github.com/nikuscs/olx-tracker) — Track OLX.pt listings and get alerts on deals
+
+## Disclaimer
+
+> This project is for **educational purposes and AI automation research only**.
+> The authors are not responsible for any misuse or for any damages resulting from the use of this tool.
+> Users are solely responsible for ensuring compliance with applicable laws and the terms of service
+> of any websites accessed. This software is provided "as-is" without warranty of any kind.
+>
+> If you are a rights holder and wish to have this project removed, please [contact me](https://github.com/nikuscs).
+
+> **Note:** This project was partially developed with AI assistance and may contain bugs or unexpected behavior. Use at your own risk.
 
 ## License
 
-MIT
+MIT — see `LICENSE`.

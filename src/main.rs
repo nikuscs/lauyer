@@ -51,6 +51,9 @@ async fn main() -> anyhow::Result<()> {
                     dgsi::resolve_courts(&args.court).context("Failed to resolve court aliases")?;
 
                 // Resolve date range
+                if args.recent.is_some() && args.since.is_some() {
+                    anyhow::bail!("--recent and --since are mutually exclusive");
+                }
                 let since = match (&args.recent, &args.since) {
                     (Some(recent), _) => {
                         Some(format::parse_recent(recent).map_err(anyhow::Error::msg)?)
@@ -103,6 +106,7 @@ async fn main() -> anyhow::Result<()> {
                     args.limit,
                     sort_by_date,
                     max_concurrent,
+                    args.delay_ms,
                 )
                 .await;
 
@@ -328,6 +332,9 @@ async fn main() -> anyhow::Result<()> {
                 }
 
                 // Resolve dates
+                if args.recent.is_some() && args.since.is_some() {
+                    anyhow::bail!("--recent and --since are mutually exclusive");
+                }
                 let since = match (&args.recent, &args.since) {
                     (Some(recent), _) => {
                         Some(format::parse_recent(recent).map_err(anyhow::Error::msg)?)
@@ -350,6 +357,7 @@ async fn main() -> anyhow::Result<()> {
                     content_types,
                     query: args.query.clone().unwrap_or_default(),
                     act_types,
+                    series: vec![],
                     since,
                     until,
                     limit: args.limit,
@@ -422,6 +430,7 @@ async fn main() -> anyhow::Result<()> {
                     content_types,
                     query: String::new(),
                     act_types,
+                    series: vec![],
                     since: Some(today),
                     until: Some(today),
                     limit: 50,

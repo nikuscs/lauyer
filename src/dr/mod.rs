@@ -4,7 +4,7 @@ pub mod search;
 pub mod session;
 
 pub use content_types::{DrContentType, resolve_act_type};
-pub use search::{DrSearchParams, DrSearchResponse, DrSearchResult, search};
+pub use search::{DrAggregations, DrSearchParams, DrSearchResponse, DrSearchResult, search};
 pub use session::DrSession;
 
 use crate::error::{LawyerrError, Result};

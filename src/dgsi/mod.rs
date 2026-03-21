@@ -31,18 +31,22 @@ fn decode_latin1(bytes: &[u8]) -> String {
 
 /// Search a single court, auto-paginating until `limit` results are collected
 /// or the server returns fewer results than requested.
+///
+/// If `delay_ms` is `Some(ms)`, sleep for `ms` milliseconds between page fetches.
 pub async fn search_court(
     fetcher: &dyn HttpFetcher,
     court: Court,
     query: &str,
     limit: u32,
     sort_by_date: bool,
+    delay_ms: Option<u64>,
 ) -> Result<(u64, Vec<DgsiSearchResult>)> {
     const PAGE_SIZE: u32 = 50;
 
     let mut results: Vec<DgsiSearchResult> = Vec::new();
     let mut total_found: u64 = 0;
     let mut start: u32 = 1;
+    let mut is_first_page = true;
 
     loop {
         let remaining = limit.saturating_sub(results.len() as u32);
@@ -50,6 +54,14 @@ pub async fn search_court(
             break;
         }
         let page_size = remaining.min(PAGE_SIZE);
+
+        // Apply delay between page fetches (not before the first one).
+        if !is_first_page {
+            if let Some(ms) = delay_ms {
+                tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
+            }
+        }
+        is_first_page = false;
 
         let url = court.search_url(query, page_size, start, sort_by_date);
         // Search results pages are served as UTF-8 (charset=UTF-8 header).
@@ -77,6 +89,9 @@ pub async fn search_court(
 
 /// Search multiple courts concurrently, bounded by `max_concurrent`.
 /// Results are returned in the same order as the input `courts` slice.
+///
+/// If `delay_ms` is `Some(ms)`, sleep for `ms` milliseconds between page
+/// fetches within each court search.
 pub async fn search_all_courts(
     fetcher: &dyn HttpFetcher,
     courts: &[Court],
@@ -84,6 +99,7 @@ pub async fn search_all_courts(
     limit: u32,
     sort_by_date: bool,
     max_concurrent: usize,
+    delay_ms: Option<u64>,
 ) -> Vec<(Court, Result<(u64, Vec<DgsiSearchResult>)>)> {
     let semaphore = Arc::new(tokio::sync::Semaphore::new(max_concurrent));
 
@@ -93,7 +109,8 @@ pub async fn search_all_courts(
             let sem = Arc::clone(&semaphore);
             async move {
                 let _permit = sem.acquire().await.expect("semaphore closed");
-                let outcome = search_court(fetcher, court, query, limit, sort_by_date).await;
+                let outcome =
+                    search_court(fetcher, court, query, limit, sort_by_date, delay_ms).await;
                 if let Err(ref e) = outcome {
                     tracing::warn!(court = court.alias(), error = %e, "Court search failed");
                 }
@@ -148,6 +165,7 @@ pub struct SearchParams {
     pub sort_by_date: bool,
     pub fetch_full: bool,
     pub max_concurrent: usize,
+    pub delay_ms: Option<u64>,
 }
 
 /// Execute a DGSI search across the specified courts.
@@ -163,6 +181,7 @@ pub async fn execute_search(
         params.limit,
         params.sort_by_date,
         params.max_concurrent,
+        params.delay_ms,
     )
     .await
 }

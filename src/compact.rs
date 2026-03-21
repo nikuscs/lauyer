@@ -22,7 +22,10 @@ pub fn compact_text(input: &str) -> String {
     }
 
     // Strip leading/trailing blank lines from the result.
-    output.trim().to_owned()
+    let trimmed = output.trim().to_owned();
+
+    // Remove well-known boilerplate lines from Portuguese legal documents.
+    strip_boilerplate(&trimmed)
 }
 
 /// Remove basic HTML tags using a simple state machine (no regex dependency).

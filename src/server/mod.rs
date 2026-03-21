@@ -174,6 +174,7 @@ async fn dgsi_search(
         limit,
         sort_by_date,
         max_concurrent,
+        None,
     )
     .await;
 
@@ -333,6 +334,7 @@ async fn dr_search(
         content_types,
         query: params.q.unwrap_or_default(),
         act_types,
+        series: vec![],
         since,
         until,
         limit: params.limit.unwrap_or(50),
@@ -384,6 +386,7 @@ async fn dr_today(
         content_types,
         query: String::new(),
         act_types,
+        series: vec![],
         since: Some(today),
         until: Some(today),
         limit: 50,
@@ -511,6 +514,19 @@ pub async fn start(
 }
 
 async fn shutdown_signal() {
-    tokio::signal::ctrl_c().await.ok();
+    let ctrl_c = tokio::signal::ctrl_c();
+    #[cfg(unix)]
+    {
+        let mut sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("failed to install SIGTERM handler");
+        tokio::select! {
+            _ = ctrl_c => {},
+            _ = sigterm.recv() => {},
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        ctrl_c.await.ok();
+    }
     tracing::info!("Shutdown signal received, stopping server");
 }

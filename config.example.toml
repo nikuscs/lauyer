@@ -1,0 +1,21 @@
+[dgsi]
+courts = ["stj", "sta", "rel-porto", "rel-lisboa"]
+
+[dr]
+content_types = ["atos-1", "atos-2", "decisoes"]
+act_types = []
+
+[http]
+delay_ms = 100
+max_concurrent = 10
+timeout_secs = 30
+retries = 3
+
+[output]
+format = "markdown"
+compact = true
+strip_stopwords = false
+
+[server]
+host = "0.0.0.0"
+port = 3000

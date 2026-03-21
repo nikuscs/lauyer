@@ -601,3 +601,49 @@ fn user_input_error_display() {
         "UserInput display should contain the message, got: {err}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Live integration tests (require network access, run with `cargo test -- --ignored`)
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+#[ignore = "requires network access to DGSI"]
+async fn live_dgsi_search_stj() {
+    let client = lawyerr::http::HttpClient::new(None, 30, 3).unwrap();
+    let (total, results) = lawyerr::dgsi::search_court(
+        &client,
+        lawyerr::dgsi::courts::Court::Stj,
+        "usucapião",
+        3,
+        false,
+        None,
+    )
+    .await
+    .unwrap();
+    assert!(total > 0);
+    assert!(!results.is_empty());
+}
+
+#[tokio::test]
+#[ignore = "requires network access to DGSI"]
+async fn live_dgsi_fetch_decision() {
+    let client = lawyerr::http::HttpClient::new(None, 30, 3).unwrap();
+    let decision = lawyerr::dgsi::fetch_full_decision(
+        &client,
+        "https://www.dgsi.pt/jstj.nsf/954f0ce6ad9dd8b980256b5f003fa814/adbdc4fb2b666586802568fc003a8daf?OpenDocument",
+    )
+    .await
+    .unwrap();
+    assert!(!decision.processo.is_empty());
+    assert!(!decision.sumario.is_empty());
+}
+
+#[tokio::test]
+#[ignore = "requires network access to DGSI"]
+async fn live_dgsi_multi_court_search() {
+    let client = lawyerr::http::HttpClient::new(None, 30, 3).unwrap();
+    let courts = vec![lawyerr::dgsi::courts::Court::Stj, lawyerr::dgsi::courts::Court::RelPorto];
+    let results =
+        lawyerr::dgsi::search_all_courts(&client, &courts, "contrato", 2, false, 2, None).await;
+    assert_eq!(results.len(), 2);
+}

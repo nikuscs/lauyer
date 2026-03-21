@@ -86,13 +86,25 @@ missing_panics_doc = "allow"
 needless_pass_by_value = "allow"
 future_not_send = "allow"
 cast_possible_truncation = "allow"
+cast_possible_wrap = "allow"
 cast_sign_loss = "allow"
+cast_precision_loss = "allow"
+cast_lossless = "allow"
+format_push_string = "allow"
+return_self_not_must_use = "allow"
+unnecessary_debug_formatting = "allow"
 # Strict denials:
 dbg_macro = "deny"
 todo = "deny"
 unimplemented = "deny"
 print_stdout = "deny"
 print_stderr = "deny"
+
+[profile.dev]
+debug = 1
+
+[profile.dev.package."*"]
+opt-level = 1
 
 [profile.release]
 lto = true
