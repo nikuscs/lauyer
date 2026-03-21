@@ -1,6 +1,8 @@
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
+use crate::format::OutputFormat;
+
 // ---------------------------------------------------------------------------
 // Sub-configurations
 // ---------------------------------------------------------------------------
@@ -74,8 +76,8 @@ impl Default for HttpConfig {
     }
 }
 
-fn default_format() -> String {
-    "markdown".to_owned()
+const fn default_format() -> OutputFormat {
+    OutputFormat::Markdown
 }
 const fn default_compact() -> bool {
     true
@@ -84,7 +86,7 @@ const fn default_compact() -> bool {
 #[derive(Debug, Deserialize)]
 pub struct OutputConfig {
     #[serde(default = "default_format")]
-    pub format: String,
+    pub format: OutputFormat,
 
     #[serde(default = "default_compact")]
     pub compact: bool,
@@ -174,27 +176,22 @@ fn try_load(path: &Path) -> anyhow::Result<Option<Config>> {
 /// Load configuration.
 ///
 /// Resolution order:
-/// 1. `path` (if supplied)
+/// 1. `path` (if supplied) -- errors are fatal for explicit paths
 /// 2. `./lawyerr.toml`
 /// 3. `~/.config/lawyerr/lawyerr.toml`
 /// 4. Compiled-in defaults
-pub fn load_config(path: Option<&Path>) -> Config {
+pub fn load_config(path: Option<&Path>) -> anyhow::Result<Config> {
     if let Some(explicit) = path {
         match try_load(explicit) {
             Ok(Some(cfg)) => {
                 tracing::info!(path = %explicit.display(), "Loaded config from explicit path");
-                return cfg;
+                return Ok(cfg);
             }
             Ok(None) => {
-                tracing::warn!(
-                    path = %explicit.display(),
-                    "Explicit config path not found, falling back to defaults"
-                );
-                return Config::default();
+                return Err(anyhow::anyhow!("Config file not found: {}", explicit.display()));
             }
             Err(e) => {
-                tracing::error!(error = %e, "Failed to load explicit config, using defaults");
-                return Config::default();
+                return Err(e.context(format!("Failed to load config from {}", explicit.display())));
             }
         }
     }
@@ -203,7 +200,7 @@ pub fn load_config(path: Option<&Path>) -> Config {
     match try_load(local) {
         Ok(Some(cfg)) => {
             tracing::info!(path = %local.display(), "Loaded config");
-            return cfg;
+            return Ok(cfg);
         }
         Ok(None) => {}
         Err(e) => {
@@ -215,7 +212,7 @@ pub fn load_config(path: Option<&Path>) -> Config {
         match try_load(&user_path) {
             Ok(Some(cfg)) => {
                 tracing::info!(path = %user_path.display(), "Loaded config");
-                return cfg;
+                return Ok(cfg);
             }
             Ok(None) => {}
             Err(e) => {
@@ -225,5 +222,5 @@ pub fn load_config(path: Option<&Path>) -> Config {
     }
 
     tracing::debug!("No config file found, using built-in defaults");
-    Config::default()
+    Ok(Config::default())
 }

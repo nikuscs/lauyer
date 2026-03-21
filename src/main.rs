@@ -6,7 +6,7 @@ use clap::Parser as _;
 use futures::stream::{FuturesUnordered, StreamExt as _};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use lawyerr::format::Renderable;
-use lawyerr::{cli, config, dgsi, dr, format, http, server};
+use lawyerr::{cli, config, dgsi, format, http, server};
 
 #[tokio::main]
 #[allow(clippy::too_many_lines, clippy::literal_string_with_formatting_args)]
@@ -19,7 +19,7 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let cli = cli::Cli::parse();
-    let cfg = config::load_config(cli.config.as_deref());
+    let cfg = config::load_config(cli.config.as_deref())?;
 
     let compact = !cli.no_compact;
     let strip_sw = cli.strip_stopwords;
@@ -27,10 +27,12 @@ async fn main() -> anyhow::Result<()> {
     let quiet = cli.quiet;
 
     // Resolve output format: explicit --format wins; otherwise infer from
-    // --output extension; otherwise fall back to markdown.
-    let fmt = cli
-        .format
-        .unwrap_or_else(|| output_path.and_then(format::format_from_extension).unwrap_or_default());
+    // --output extension; otherwise fall back to config value.
+    let fmt = cli.format.unwrap_or_else(|| {
+        output_path
+            .and_then(format::format_from_extension)
+            .unwrap_or_else(|| cfg.output.format.clone())
+    });
 
     match cli.command {
         cli::Commands::Dgsi { command } => match command {
@@ -70,8 +72,8 @@ async fn main() -> anyhow::Result<()> {
                 let field_filter = args.field.as_deref().zip(args.value.as_deref());
                 let query = dgsi::build_query(&args.query, since, until, field_filter);
 
-                let sort_by_date = args.sort == "date";
-                let max_concurrent = args.max_concurrent.unwrap_or(3);
+                let sort_by_date = matches!(args.sort, cli::SortOrder::Date);
+                let max_concurrent = args.max_concurrent.unwrap_or(cfg.http.max_concurrent).max(1);
 
                 // --- Progress: set up per-court spinners ---
                 let mp = MultiProgress::new();
@@ -279,39 +281,9 @@ async fn main() -> anyhow::Result<()> {
             }
         },
 
-        cli::Commands::Dr { command } => match command {
-            cli::DrCommands::Search(_args) => {
-                let pb = if quiet {
-                    None
-                } else {
-                    let pb = ProgressBar::new_spinner();
-                    pb.set_style(
-                        ProgressStyle::with_template("{spinner} {msg}")
-                            .unwrap_or_else(|_| ProgressStyle::default_spinner()),
-                    );
-                    pb.set_message("Searching DR...");
-                    pb.enable_steady_tick(std::time::Duration::from_millis(100));
-                    Some(pb)
-                };
-
-                let _results = dr::search().await?;
-
-                if let Some(pb) = pb {
-                    pb.finish_and_clear();
-                }
-
-                tracing::info!("dr search: not fully implemented yet");
-            }
-            cli::DrCommands::Fetch { url: _ } => {
-                tracing::info!("dr fetch: not fully implemented yet");
-            }
-            cli::DrCommands::Today(_args) => {
-                tracing::info!("dr today: not fully implemented yet");
-            }
-            cli::DrCommands::Types => {
-                tracing::info!("dr types: not fully implemented yet");
-            }
-        },
+        cli::Commands::Dr { .. } => {
+            anyhow::bail!("DR module not implemented yet");
+        }
 
         cli::Commands::Serve(args) => {
             let http_client = http::HttpClient::new(

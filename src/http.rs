@@ -81,6 +81,7 @@ impl HttpClient {
 
     async fn execute_with_retry(
         &self,
+        url: &str,
         build: impl Fn() -> reqwest::RequestBuilder,
     ) -> Result<reqwest::Response> {
         let mut last_err: Option<LawyerrError> = None;
@@ -104,7 +105,7 @@ impl HttpClient {
                         warn!(attempt, %status, "Retryable HTTP status");
                         last_err = Some(LawyerrError::Http {
                             source: resp.error_for_status().unwrap_err(),
-                            url: "<retryable status>".to_owned(),
+                            url: url.to_owned(),
                         });
                         continue;
                     }
@@ -146,7 +147,7 @@ impl HttpClient {
 impl HttpFetcher for HttpClient {
     async fn get(&self, url: &str) -> Result<Vec<u8>> {
         let owned_url = url.to_owned();
-        let resp = self.execute_with_retry(|| self.client.get(&owned_url)).await?;
+        let resp = self.execute_with_retry(url, || self.client.get(&owned_url)).await?;
         resp.bytes()
             .await
             .map(|b| b.to_vec())
@@ -155,7 +156,7 @@ impl HttpFetcher for HttpClient {
 
     async fn get_text(&self, url: &str) -> Result<String> {
         let owned_url = url.to_owned();
-        let resp = self.execute_with_retry(|| self.client.get(&owned_url)).await?;
+        let resp = self.execute_with_retry(url, || self.client.get(&owned_url)).await?;
         resp.text().await.map_err(|e| LawyerrError::Http { url: url.to_owned(), source: e })
     }
 
@@ -170,7 +171,7 @@ impl HttpFetcher for HttpClient {
         let owned_headers: Vec<(String, String)> = headers.to_vec();
 
         let resp = self
-            .execute_with_retry(|| {
+            .execute_with_retry(url, || {
                 let mut req = self.client.post(&owned_url).json(&owned_body);
                 for (k, v) in &owned_headers {
                     req = req.header(k.as_str(), v.as_str());

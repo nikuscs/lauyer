@@ -1,6 +1,13 @@
 use clap::{Args, Parser, Subcommand};
 use std::path::PathBuf;
 
+#[derive(Debug, Clone, Default, clap::ValueEnum)]
+pub enum SortOrder {
+    #[default]
+    Relevance,
+    Date,
+}
+
 #[derive(Parser)]
 #[command(
     name = "lawyerr",
@@ -95,8 +102,8 @@ pub struct DgsiSearchArgs {
     pub limit: u32,
 
     /// Sort order (relevance, date)
-    #[arg(long, default_value = "relevance")]
-    pub sort: String,
+    #[arg(long, value_enum, default_value_t = SortOrder::Relevance)]
+    pub sort: SortOrder,
 
     /// Filter field name for structured search
     #[arg(long)]

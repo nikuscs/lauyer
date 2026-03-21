@@ -191,22 +191,7 @@ fn split_by_br(inner_html: &str) -> Vec<String> {
 
     normalized
         .split('\n')
-        .map(|s| strip_html_tags(s).trim().to_owned())
+        .map(|s| crate::compact::strip_html_tags(s).trim().to_owned())
         .filter(|s| !s.is_empty())
         .collect()
-}
-
-/// Remove HTML tags from a string, returning only text content.
-fn strip_html_tags(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    let mut in_tag = false;
-    for ch in s.chars() {
-        match ch {
-            '<' => in_tag = true,
-            '>' => in_tag = false,
-            _ if !in_tag => out.push(ch),
-            _ => {}
-        }
-    }
-    out
 }

@@ -21,6 +21,9 @@ pub enum LawyerrError {
     #[error("Config error: {message}")]
     Config { message: String },
 
+    #[error("User input error: {message}")]
+    UserInput { message: String },
+
     #[error("I/O error: {source}")]
     Io {
         #[from]

@@ -145,7 +145,7 @@ fn extract_value(value_td: &scraper::ElementRef<'_>, sel_font_blue: &Selector) -
 fn br_html_to_text(html: &str) -> String {
     // Replace <br> variants with a newline marker then strip all remaining tags.
     let with_newlines = replace_br(html);
-    strip_tags(&with_newlines)
+    crate::compact::strip_html_tags(&with_newlines)
 }
 
 fn replace_br(s: &str) -> String {
@@ -170,21 +170,6 @@ fn replace_br(s: &str) -> String {
             out.push('\n');
         }
         // All other tags are silently dropped.
-    }
-    out
-}
-
-fn strip_tags(s: &str) -> String {
-    // Remove anything between < and >.
-    let mut out = String::with_capacity(s.len());
-    let mut in_tag = false;
-    for ch in s.chars() {
-        match ch {
-            '<' => in_tag = true,
-            '>' => in_tag = false,
-            _ if !in_tag => out.push(ch),
-            _ => {}
-        }
     }
     out
 }

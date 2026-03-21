@@ -39,6 +39,7 @@ impl IntoResponse for AppError {
         let status = match &self.0 {
             LawyerrError::Http { .. } => StatusCode::BAD_GATEWAY,
             LawyerrError::Session { .. } => StatusCode::SERVICE_UNAVAILABLE,
+            LawyerrError::UserInput { .. } => StatusCode::BAD_REQUEST,
             LawyerrError::Parse { .. }
             | LawyerrError::Encoding { .. }
             | LawyerrError::Config { .. }
@@ -142,8 +143,9 @@ async fn dgsi_search(
         .since
         .as_deref()
         .map(|s| {
-            s.parse::<chrono::NaiveDate>()
-                .map_err(|_| LawyerrError::Config { message: format!("Invalid since date: '{s}'") })
+            s.parse::<chrono::NaiveDate>().map_err(|_| LawyerrError::UserInput {
+                message: format!("Invalid since date: '{s}'"),
+            })
         })
         .transpose()?;
 
@@ -151,8 +153,9 @@ async fn dgsi_search(
         .until
         .as_deref()
         .map(|s| {
-            s.parse::<chrono::NaiveDate>()
-                .map_err(|_| LawyerrError::Config { message: format!("Invalid until date: '{s}'") })
+            s.parse::<chrono::NaiveDate>().map_err(|_| LawyerrError::UserInput {
+                message: format!("Invalid until date: '{s}'"),
+            })
         })
         .transpose()?;
 
@@ -160,19 +163,30 @@ async fn dgsi_search(
     let limit = params.limit.unwrap_or(50);
     let sort_by_date = params.sort.as_deref() == Some("date");
     let fetch_full = params.fetch_full.unwrap_or(false);
-    let compact = params.compact.unwrap_or(true);
+    let compact = params.compact.unwrap_or(state.config.output.compact);
     let fmt = parse_output_format(params.format.as_deref());
+    let max_concurrent = state.config.http.max_concurrent.max(1);
 
-    let court_results =
-        dgsi::search_all_courts(&state.http_client, &courts, &query, limit, sort_by_date, 3).await;
+    let court_results = dgsi::search_all_courts(
+        &state.http_client,
+        &courts,
+        &query,
+        limit,
+        sort_by_date,
+        max_concurrent,
+    )
+    .await;
 
     let mut all_renderables: Vec<Box<dyn Renderable>> = Vec::new();
     let mut total: u64 = 0;
     let mut source_parts: Vec<String> = Vec::new();
+    let mut error_count: usize = 0;
+    let court_count = court_results.len();
 
     for (court, result) in court_results {
         match result {
             Err(e) => {
+                error_count += 1;
                 tracing::warn!(court = court.alias(), error = %e, "Skipping court");
             }
             Ok((court_total, results)) => {
@@ -197,6 +211,14 @@ async fn dgsi_search(
         }
     }
 
+    // If all courts failed, return a 502 error instead of empty 200
+    if all_renderables.is_empty() && error_count > 0 && error_count == court_count {
+        let body = serde_json::json!({
+            "error": format!("All {court_count} court(s) failed to respond")
+        });
+        return Ok((StatusCode::BAD_GATEWAY, Json(body)).into_response());
+    }
+
     let source = if source_parts.is_empty() { "DGSI".to_owned() } else { source_parts.join(", ") };
 
     let response = SearchResponse { source, query, total, results: all_renderables };
@@ -209,7 +231,7 @@ async fn dgsi_fetch(
     State(state): State<Arc<AppState>>,
     Query(params): Query<DgsiFetchParams>,
 ) -> Result<Response, AppError> {
-    let compact = params.compact.unwrap_or(true);
+    let compact = params.compact.unwrap_or(state.config.output.compact);
     let fmt = parse_output_format(params.format.as_deref());
 
     let decision = dgsi::fetch_full_decision(&state.http_client, &params.url).await?;

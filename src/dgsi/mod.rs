@@ -7,7 +7,6 @@ use std::sync::Arc;
 
 use courts::Court;
 use decision::{DgsiDecision, parse_decision};
-use futures::stream::{FuturesUnordered, StreamExt as _};
 use search::{DgsiSearchResult, parse_search_results};
 
 use crate::error::{LawyerrError, Result};
@@ -77,6 +76,7 @@ pub async fn search_court(
 }
 
 /// Search multiple courts concurrently, bounded by `max_concurrent`.
+/// Results are returned in the same order as the input `courts` slice.
 pub async fn search_all_courts(
     fetcher: &dyn HttpFetcher,
     courts: &[Court],
@@ -87,7 +87,7 @@ pub async fn search_all_courts(
 ) -> Vec<(Court, Result<(u64, Vec<DgsiSearchResult>)>)> {
     let semaphore = Arc::new(tokio::sync::Semaphore::new(max_concurrent));
 
-    let mut work: FuturesUnordered<_> = courts
+    let futures: Vec<_> = courts
         .iter()
         .map(|&court| {
             let sem = Arc::clone(&semaphore);
@@ -102,11 +102,7 @@ pub async fn search_all_courts(
         })
         .collect();
 
-    let mut out = Vec::with_capacity(courts.len());
-    while let Some(item) = work.next().await {
-        out.push(item);
-    }
-    out
+    futures::future::join_all(futures).await
 }
 
 /// Fetch and parse a single court decision from `url`.
@@ -138,4 +134,35 @@ pub fn resolve_courts(aliases: &[String]) -> Result<Vec<Court>> {
 /// Returns `(alias, display_name)` pairs for every known court.
 pub fn list_courts() -> Vec<(String, String)> {
     Court::all().iter().map(|c| (c.alias().to_owned(), c.display_name().to_owned())).collect()
+}
+
+// ---------------------------------------------------------------------------
+// Shared search service
+// ---------------------------------------------------------------------------
+
+/// Parameters for executing a DGSI search across one or more courts.
+pub struct SearchParams {
+    pub courts: Vec<Court>,
+    pub query: String,
+    pub limit: u32,
+    pub sort_by_date: bool,
+    pub fetch_full: bool,
+    pub max_concurrent: usize,
+}
+
+/// Execute a DGSI search across the specified courts.
+/// Results are returned in the same order as the input courts.
+pub async fn execute_search(
+    fetcher: &dyn HttpFetcher,
+    params: &SearchParams,
+) -> Vec<(Court, Result<(u64, Vec<DgsiSearchResult>)>)> {
+    search_all_courts(
+        fetcher,
+        &params.courts,
+        &params.query,
+        params.limit,
+        params.sort_by_date,
+        params.max_concurrent,
+    )
+    .await
 }
