@@ -151,32 +151,25 @@ port = 3000
 
 ```bash
 lawyerr serve --port 3000
-# or via env vars
-LAWYERR_PORT=8080 LAWYERR_HOST=127.0.0.1 lawyerr serve
 ```
 
-### Endpoints
+**`GET /dgsi/search`** `?q=usucapiao&court=stj&limit=5&since=2024-01-01&sort=date&format=json&compact=true&fetch_full=false`
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/health` | Health check |
-| `GET` | `/dgsi/search?q=...` | Search DGSI courts |
-| `GET` | `/dgsi/fetch?url=...` | Fetch single decision |
-| `GET` | `/dgsi/courts` | List courts |
-| `GET` | `/dr/search?type=...` | Search DR legislation |
-| `GET` | `/dr/today` | Today's publications |
-| `GET` | `/dr/types` | List act types |
+**`GET /dgsi/fetch`** `?url=https://www.dgsi.pt/...&format=md`
 
-```bash
-curl "http://localhost:3000/dgsi/search?q=usucapiao&court=stj&limit=5"
-curl "http://localhost:3000/dr/search?type=portaria&since=2026-03-14"
-curl "http://localhost:3000/dr/today"
-curl "http://localhost:3000/dgsi/search?q=contrato&format=json"
-```
+**`GET /dgsi/courts`** `?format=json`
 
-All endpoints default to markdown. Add `?format=json` for JSON.
+**`GET /dr/search`** `?q=trabalho&type=portaria&content=atos-1&since=2026-03-01&limit=10&format=json`
 
-## Docker
+**`GET /dr/today`** `?type=portaria&format=json`
+
+**`GET /dr/types`** `?format=json`
+
+**`GET /health`**
+
+All endpoints default to markdown. Add `?format=json` for JSON. Env vars: `LAWYERR_PORT`, `LAWYERR_HOST`.
+
+### Docker
 
 ```bash
 docker build -t lawyerr .
@@ -185,9 +178,9 @@ docker run -p 3000:3000 lawyerr serve
 
 ## Related Projects
 
-- [crauler](https://github.com/nikuscs/crauler) — Web crawler with proxy routing and HTML→Markdown
-- [amz-crawler](https://github.com/nikuscs/amz-crawler) — Amazon product crawler with TLS fingerprinting
-- [scrauper](https://github.com/nikuscs/scrauper) — Multi-threaded ScreenScraper.fr scraper for ES-DE
+- [🕷️ crauler](https://github.com/nikuscs/crauler) — Web crawler with proxy routing and HTML→Markdown
+- [🦎 amz-crawler](https://github.com/nikuscs/amz-crawler) — Amazon product crawler with TLS fingerprinting
+- [🕹️ scrauper](https://github.com/nikuscs/scrauper) — Multi-threaded ScreenScraper.fr scraper for ES-DE
 
 ## License
 
