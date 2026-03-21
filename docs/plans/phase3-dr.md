@@ -219,3 +219,5 @@
 **Trait-based HTTP:** `DrSession` wraps `HttpClient` (which implements `HttpFetcher`). For unit tests, create a `DrSession` with a mock client. The session init calls (`moduleversioninfo`, `roles`) and search POST can all be mocked by providing canned responses.
 
 **`DrSession` owns the `HttpClient`**, not a reference. This avoids lifetime issues. In server mode, the `DrSession` lives in `AppState` behind `RwLock`.
+
+**Quality gate:** `cargo fmt --check && cargo clippy -- -D warnings && cargo test` must pass before this phase is complete.

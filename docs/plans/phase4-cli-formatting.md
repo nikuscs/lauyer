@@ -71,3 +71,5 @@
 - [ ] `lawyerr dgsi search "contrato" --court stj --recent 1y` — works as shorthand
 - [ ] `lawyerr dgsi search "contrato" --court stj --strip-stopwords` — shorter output
 - [ ] Pipe test: `lawyerr dgsi search "contrato" --court stj --quiet | wc -l` — works cleanly
+
+**Quality gate:** `cargo fmt --check && cargo clippy -- -D warnings && cargo test` must pass before this phase is complete.

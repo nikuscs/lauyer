@@ -169,3 +169,5 @@
 **Date format gotcha:** DGSI uses `MM/DD/YYYY` (American format), not `DD/MM/YYYY`. Parse accordingly with `chrono::NaiveDate::parse_from_str(s, "%m/%d/%Y")`.
 
 **Trait-based HTTP:** All DGSI functions accept `&dyn HttpFetcher`, not `&HttpClient`. This allows unit testing with `MockHttpFetcher` returning fixture HTML files. See Phase 1 testability section.
+
+**Quality gate:** `cargo fmt --check && cargo clippy -- -D warnings && cargo test` must pass before this phase is complete.

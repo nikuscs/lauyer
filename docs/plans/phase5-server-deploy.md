@@ -112,3 +112,5 @@
 **Keep handlers thin:** Handler functions should parse query params, build the search params struct, call the same pipeline as CLI, and format the response. No business logic in handlers.
 
 **DR session lifecycle:** Initialize `DrSession` at server startup. If a search fails with session error, take write lock, refresh session, retry. Use `tokio::sync::RwLock` (not `std::sync::RwLock`) since refresh is async.
+
+**Quality gate:** `cargo fmt --check && cargo clippy -- -D warnings && cargo test` must pass before this phase is complete.

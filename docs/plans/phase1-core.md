@@ -12,6 +12,28 @@
 - [ ] Initialize Cargo project: `cargo init --name lawyerr`
 - [ ] Set up `Cargo.toml` with all dependencies (see initial plan Dependencies section)
 - [ ] Set Rust edition 2024, minimum Rust version
+- [ ] Add `rustfmt.toml`:
+  ```toml
+  max_width = 100
+  use_small_heuristics = "Max"
+  imports_granularity = "Module"
+  group_imports = "StdExternalCrate"
+  ```
+- [ ] Add `clippy.toml` or configure in `Cargo.toml`:
+  ```toml
+  [lints.rust]
+  unsafe_code = "forbid"
+
+  [lints.clippy]
+  all = { level = "warn", priority = -1 }
+  pedantic = { level = "warn", priority = -1 }
+  # Allow these common pedantic false positives:
+  module_name_repetitions = "allow"
+  must_use_candidate = "allow"
+  missing_errors_doc = "allow"
+  missing_panics_doc = "allow"
+  ```
+- [ ] Add `.gitignore`: `target/`, `.env`, `*.swp`
 - [ ] Create module directory structure:
   ```
   src/
@@ -157,11 +179,15 @@
 - [ ] Subcommands should print "not implemented yet" for now
 
 ### Verification
+- [ ] `cargo fmt --check` — no formatting issues
+- [ ] `cargo clippy -- -D warnings` — zero warnings (treat warnings as errors)
 - [ ] `cargo build` — compiles without errors
-- [ ] `cargo clippy` — no warnings
+- [ ] `cargo test` — all unit tests pass
 - [ ] `cargo run -- --help` — shows help with all subcommands
 - [ ] `cargo run -- dgsi search "test" --help` — shows search flags
 - [ ] `cargo run -- dr search "test" --help` — shows DR search flags
+
+**Every phase must pass `cargo fmt --check && cargo clippy -- -D warnings && cargo test` before moving to the next.**
 
 ---
 
