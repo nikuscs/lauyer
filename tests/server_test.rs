@@ -211,6 +211,39 @@ async fn dgsi_courts_response_structure() {
 }
 
 // ---------------------------------------------------------------------------
+// dgsi_courts default (no format param) — exercises the markdown output path
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn dgsi_courts_default_is_markdown() {
+    let app = test_router();
+
+    let response = app
+        .oneshot(Request::builder().uri("/dgsi/courts").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let content_type = response
+        .headers()
+        .get(axum::http::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    assert!(
+        content_type.starts_with("text/markdown"),
+        "Expected text/markdown content-type, got: {content_type}"
+    );
+
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body_str = std::str::from_utf8(&body).unwrap();
+    assert!(
+        body_str.contains("| Alias |"),
+        "Markdown response must contain the table header '| Alias |': {body_str}"
+    );
+}
+
+// ---------------------------------------------------------------------------
 // dgsi_search with date params (since/until) — exercises date parsing lines
 // ---------------------------------------------------------------------------
 

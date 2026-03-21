@@ -2,7 +2,8 @@ use std::sync::Mutex;
 
 use lawyerr::dgsi::courts::Court;
 use lawyerr::dgsi::{
-    fetch_full_decision, list_courts, resolve_courts, search_all_courts, search_court,
+    SearchParams, execute_search, fetch_full_decision, list_courts, resolve_courts,
+    search_all_courts, search_court,
 };
 use lawyerr::error::{LawyerrError, Result};
 use lawyerr::http::HttpFetcher;
@@ -256,7 +257,32 @@ async fn list_courts_returns_all() {
     );
 }
 
-// 10. `search_court` paginates: first page full (5 results, Count=5), second
+// 10. `execute_search` delegates to `search_all_courts` — verify it returns
+//     the same results as calling `search_all_courts` directly with equivalent args.
+#[tokio::test]
+async fn execute_search_uses_search_all_courts() {
+    let mock = MockHttpFetcher::new();
+    mock.add_text("jstj.nsf", Ok(search_results_html()));
+
+    let params = SearchParams {
+        courts: vec![Court::Stj],
+        query: "usucapiao".to_owned(),
+        limit: 50,
+        sort_by_date: false,
+        fetch_full: false,
+        max_concurrent: 2,
+    };
+
+    let outcomes = execute_search(&mock, &params).await;
+
+    assert_eq!(outcomes.len(), 1, "one court requested → one outcome");
+    let (_court, result) = &outcomes[0];
+    let (_total, results) = result.as_ref().expect("STJ search should succeed");
+    assert_eq!(results.len(), 5, "fixture contains 5 results");
+    assert_eq!(results[0].processo, "084380");
+}
+
+// 11. `search_court` paginates: first page full (5 results, Count=5), second
 //     page short (2 results) → stops.  Results are then truncated to limit=5.
 #[tokio::test]
 async fn search_court_pagination() {

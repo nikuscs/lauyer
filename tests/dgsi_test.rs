@@ -590,6 +590,19 @@ async fn lawyerr_error_from_reqwest_error() {
 }
 
 // ---------------------------------------------------------------------------
+// LawyerrError::UserInput display (error.rs)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn user_input_error_display() {
+    let err = lawyerr::error::LawyerrError::UserInput { message: "bad date".to_owned() };
+    assert!(
+        err.to_string().contains("bad date"),
+        "UserInput display should contain the message, got: {err}"
+    );
+}
+
+// ---------------------------------------------------------------------------
 // dr::search stub (dr/mod.rs lines 5-6)
 // ---------------------------------------------------------------------------
 
