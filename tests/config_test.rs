@@ -1,4 +1,4 @@
-use lauyer::config::{Config, load_config};
+use lauyer::config::{Config, load_config, try_load};
 use lauyer::format::OutputFormat;
 use std::io::Write as _;
 
@@ -135,4 +135,84 @@ fn load_config_explicit_path_io_error_context() {
         msg.contains("Failed to parse") || msg.contains(".toml") || !msg.is_empty(),
         "error must be non-empty: {msg}"
     );
+}
+
+// ---------------------------------------------------------------------------
+// try_load — direct tests for line 152 (non-NotFound IO error)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn try_load_returns_none_for_missing_file() {
+    use std::path::Path;
+    let path = Path::new("/tmp/lauyer_definitely_not_here_xyz987.toml");
+    let result = try_load(path);
+    assert!(result.is_ok(), "missing file must return Ok(None), not Err");
+    assert!(result.unwrap().is_none(), "missing file must return None");
+}
+
+#[test]
+fn try_load_returns_some_for_valid_toml() {
+    let mut f = tempfile::NamedTempFile::new().unwrap();
+    write!(f, "[server]\nport = 8888\n").unwrap();
+    let result = try_load(f.path());
+    assert!(result.is_ok(), "valid TOML must return Ok(Some(...))");
+    let cfg = result.unwrap().expect("valid TOML must return Some");
+    assert_eq!(cfg.server.port, 8888);
+}
+
+#[test]
+fn try_load_returns_err_for_invalid_toml() {
+    let mut f = tempfile::NamedTempFile::new().unwrap();
+    write!(f, "this is not [ valid toml {{ at all").unwrap();
+    let result = try_load(f.path());
+    assert!(result.is_err(), "invalid TOML must return Err");
+}
+
+// ---------------------------------------------------------------------------
+// load_config(None) — local config error branch (lines 181-187)
+// Runs in a temp dir that contains an invalid lauyer.toml: the error is
+// logged as a warning and the function falls through to defaults.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn load_config_none_local_invalid_toml_falls_back_to_defaults() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let local_cfg = dir.path().join("lauyer.toml");
+    std::fs::write(&local_cfg, "not [ valid toml {{ at all").unwrap();
+
+    let original_dir = std::env::current_dir().unwrap();
+    std::env::set_current_dir(dir.path()).unwrap();
+
+    let result = load_config(None);
+
+    std::env::set_current_dir(&original_dir).unwrap();
+
+    // The error is swallowed; function must not fail and must return defaults.
+    let cfg = result.expect("invalid local config must not cause load_config to return Err");
+    assert!(cfg.server.port > 0, "fallback config must have a valid port");
+    assert_eq!(cfg.server.port, 3000, "fallback must use built-in default port");
+}
+
+// ---------------------------------------------------------------------------
+// load_config(None) — user config path (lines 193-199)
+// Exercises the user config path discovery branch by calling load_config(None)
+// from an empty dir (no local lauyer.toml). The function will then check the
+// user config path (~/.config/lauyer/lauyer.toml) and either load it or fall
+// through to defaults — both paths must return Ok.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn load_config_none_exercises_user_config_path() {
+    // Change to a fresh empty dir with no lauyer.toml so the local-config
+    // branch returns None and execution reaches the user-config branch.
+    let empty_dir = tempfile::TempDir::new().unwrap();
+    let original_dir = std::env::current_dir().unwrap();
+    std::env::set_current_dir(empty_dir.path()).unwrap();
+
+    let result = load_config(None);
+
+    std::env::set_current_dir(&original_dir).unwrap();
+
+    let cfg = result.expect("load_config(None) from empty dir must succeed");
+    assert!(cfg.server.port > 0, "config port must be a valid port");
 }

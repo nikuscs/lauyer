@@ -833,3 +833,117 @@ async fn app_error_parse_variant_is_500() {
     let response = err.into_response();
     assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
 }
+
+// ---------------------------------------------------------------------------
+// DR handler param parsing — limit, compact, sort
+// If DR is reachable (200), the post-session logic runs and covers those
+// lines.  If not (502/500), still acceptable — must never return 400.
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn dr_search_with_limit_param() {
+    let app = test_router();
+
+    let response = app
+        .oneshot(Request::builder().uri("/dr/search?q=test&limit=5").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+
+    let status = response.status();
+    assert_ne!(status, StatusCode::BAD_REQUEST, "limit=5 must not return 400");
+    assert!(
+        status == StatusCode::OK
+            || status == StatusCode::BAD_GATEWAY
+            || status == StatusCode::INTERNAL_SERVER_ERROR,
+        "Unexpected status for dr_search_with_limit_param: {status}"
+    );
+}
+
+#[tokio::test]
+async fn dr_search_compact_false() {
+    let app = test_router();
+
+    let response = app
+        .oneshot(
+            Request::builder().uri("/dr/search?q=test&compact=false").body(Body::empty()).unwrap(),
+        )
+        .await
+        .unwrap();
+
+    let status = response.status();
+    assert_ne!(status, StatusCode::BAD_REQUEST, "compact=false must not return 400");
+    assert!(
+        status == StatusCode::OK
+            || status == StatusCode::BAD_GATEWAY
+            || status == StatusCode::INTERNAL_SERVER_ERROR,
+        "Unexpected status for dr_search_compact_false: {status}"
+    );
+}
+
+#[tokio::test]
+async fn dr_search_with_sort() {
+    let app = test_router();
+
+    let response = app
+        .oneshot(Request::builder().uri("/dr/search?q=test&sort=date").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+
+    let status = response.status();
+    assert_ne!(status, StatusCode::BAD_REQUEST, "sort=date must not return 400");
+    assert!(
+        status == StatusCode::OK
+            || status == StatusCode::BAD_GATEWAY
+            || status == StatusCode::INTERNAL_SERVER_ERROR,
+        "Unexpected status for dr_search_with_sort: {status}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// AppError remaining variants — Encoding and Io → 500 INTERNAL_SERVER_ERROR
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn app_error_encoding_variant_is_500() {
+    use axum::response::IntoResponse as _;
+    use lauyer::error::LauyerError;
+    use lauyer::server::AppError;
+
+    let err = AppError::from(LauyerError::Encoding { message: "bad encoding".to_owned() });
+    let response = err.into_response();
+    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+}
+
+#[tokio::test]
+async fn app_error_config_variant_is_500() {
+    use axum::response::IntoResponse as _;
+    use lauyer::error::LauyerError;
+    use lauyer::server::AppError;
+
+    let err = AppError::from(LauyerError::Config { message: "bad config".to_owned() });
+    let response = err.into_response();
+    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+}
+
+#[tokio::test]
+async fn app_error_userinput_variant_is_400() {
+    use axum::response::IntoResponse as _;
+    use lauyer::error::LauyerError;
+    use lauyer::server::AppError;
+
+    let err = AppError::from(LauyerError::UserInput { message: "bad input".to_owned() });
+    let response = err.into_response();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn app_error_io_variant_is_500() {
+    use axum::response::IntoResponse as _;
+    use lauyer::error::LauyerError;
+    use lauyer::server::AppError;
+
+    let io_err = std::io::Error::new(std::io::ErrorKind::BrokenPipe, "broken pipe");
+    let err = AppError::from(LauyerError::Io { source: io_err });
+    let response = err.into_response();
+    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+}

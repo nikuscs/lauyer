@@ -2,7 +2,7 @@
 
 ![CI](https://github.com/nikuscs/lauyer/actions/workflows/ci.yml/badge.svg)
 ![Release](https://img.shields.io/github/v/release/nikuscs/lauyer)
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial-red.svg)
 
 **Fast Rust CLI for searching Portuguese court jurisprudence (DGSI) and legislation (Diário da República), optimized for LLM consumption.**
 
@@ -178,4 +178,6 @@ docker run -p 3000:3000 lauyer serve
 
 ## License
 
-MIT
+PolyForm Noncommercial 1.0.0 with AI Restriction — see `LICENSE`.
+
+Personal and non-commercial use only. Commercial use, AI training, and AI crawling are prohibited.

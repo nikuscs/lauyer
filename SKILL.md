@@ -220,12 +220,14 @@ lauyer dgsi search "trabalho" --format json | jq 'group_by(.court) | map({court:
 
 ## HTTP API
 
+If the user has a lauyer server running, they must provide the base URL (e.g. `http://localhost:3000` or `https://lauyer.example.com`). **Do not guess the URL** — ask the user for it. To start a local server:
+
 ```bash
 lauyer serve --port 3000
 # Env vars: LAUYER_PORT, LAUYER_HOST
 ```
 
-All endpoints return markdown by default. Add `?format=json` for JSON, `?format=table` for table.
+All endpoints return markdown by default. Add `?format=json` for JSON, `?format=table` for table. Examples below use `$LAUYER_URL` as a placeholder — replace with the actual server URL.
 
 ### `GET /health`
 
@@ -246,7 +248,7 @@ Returns `{"status":"ok","version":"0.1.0"}`.
 | `format` | no | `markdown`, `json`, `table` |
 
 ```bash
-curl "http://localhost:3000/dgsi/search?q=usucapiao&court=stj,sta&limit=5&sort=date&format=json"
+curl "$LAUYER_URL/dgsi/search?q=usucapiao&court=stj,sta&limit=5&sort=date&format=json"
 ```
 
 ### `GET /dgsi/fetch`
@@ -258,7 +260,7 @@ curl "http://localhost:3000/dgsi/search?q=usucapiao&court=stj,sta&limit=5&sort=d
 | `compact` | no | `true`/`false` |
 
 ```bash
-curl "http://localhost:3000/dgsi/fetch?url=https://www.dgsi.pt/jstj.nsf/...&format=json"
+curl "$LAUYER_URL/dgsi/fetch?url=https://www.dgsi.pt/jstj.nsf/...&format=json"
 ```
 
 ### `GET /dgsi/courts`
@@ -281,7 +283,7 @@ curl "http://localhost:3000/dgsi/fetch?url=https://www.dgsi.pt/jstj.nsf/...&form
 | `format` | no | `markdown`, `json`, `table` |
 
 ```bash
-curl "http://localhost:3000/dr/search?q=trabalho&type=portaria,lei&content=atos-1&since=2026-03-01&format=json"
+curl "$LAUYER_URL/dr/search?q=trabalho&type=portaria,lei&content=atos-1&since=2026-03-01&format=json"
 ```
 
 ### `GET /dr/today`
@@ -293,7 +295,7 @@ curl "http://localhost:3000/dr/search?q=trabalho&type=portaria,lei&content=atos-
 | `format` | no | `markdown`, `json`, `table` |
 
 ```bash
-curl "http://localhost:3000/dr/today?type=portaria&format=json"
+curl "$LAUYER_URL/dr/today?type=portaria&format=json"
 ```
 
 ### `GET /dr/types`

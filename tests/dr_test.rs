@@ -1456,3 +1456,191 @@ async fn live_dr_search_text_query() {
     assert!(response.total > 0);
     assert!(!response.results.is_empty());
 }
+
+// ---------------------------------------------------------------------------
+// DrSession::new_from_urls — version info fetch failure (lines 51-52)
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn test_session_new_from_urls_version_fetch_error() {
+    // Use port 1 on localhost which always refuses connections (reserved port).
+    let client = HttpClient::new(None, 2, 0).unwrap();
+    let version_url = "http://127.0.0.1:1/version";
+    let roles_url = "http://127.0.0.1:1/roles";
+
+    let result = DrSession::new_from_urls(client, version_url, roles_url).await;
+    assert!(result.is_err(), "connection refused on version URL must return an error");
+}
+
+// ---------------------------------------------------------------------------
+// DrSession::refresh_from_urls — covers refresh() delegation + all error paths
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn test_session_refresh_from_urls_success() {
+    let server = MockServer::start().await;
+
+    // First call for new_from_urls
+    Mock::given(method("GET"))
+        .and(path("/dr/moduleservices/moduleversioninfo"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"versionToken":"v1"}"#))
+        .up_to_n_times(1)
+        .mount(&server)
+        .await;
+
+    // Second call for refresh_from_urls
+    Mock::given(method("GET"))
+        .and(path("/dr/moduleservices/moduleversioninfo"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"versionToken":"v2"}"#))
+        .mount(&server)
+        .await;
+
+    Mock::given(method("GET"))
+        .and(path("/dr/moduleservices/roles"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("ok"))
+        .mount(&server)
+        .await;
+
+    let client = HttpClient::new(None, 10, 0).unwrap();
+    let version_url = format!("{}/dr/moduleservices/moduleversioninfo", server.uri());
+    let roles_url = format!("{}/dr/moduleservices/roles", server.uri());
+
+    let mut session = DrSession::new_from_urls(client, &version_url, &roles_url).await.unwrap();
+    assert_eq!(session.module_version(), "v1");
+
+    session.refresh_from_urls(&version_url, &roles_url).await.unwrap();
+    assert_eq!(session.module_version(), "v2");
+}
+
+#[tokio::test]
+async fn test_session_refresh_from_urls_version_fetch_error() {
+    let server = MockServer::start().await;
+
+    // Setup the initial session
+    Mock::given(method("GET"))
+        .and(path("/version"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"versionToken":"v1"}"#))
+        .up_to_n_times(1)
+        .mount(&server)
+        .await;
+
+    Mock::given(method("GET"))
+        .and(path("/roles"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("ok"))
+        .mount(&server)
+        .await;
+
+    let client = HttpClient::new(None, 10, 0).unwrap();
+    let version_url = format!("{}/version", server.uri());
+    let roles_url = format!("{}/roles", server.uri());
+
+    let mut session = DrSession::new_from_urls(client, &version_url, &roles_url).await.unwrap();
+
+    // Use port 1 on localhost (reserved, always refuses) to trigger the Err branch
+    // in refresh_from_urls which logs a warning at lines 144-145.
+    let result = session.refresh_from_urls("http://127.0.0.1:1/dead-version", &roles_url).await;
+    assert!(result.is_err(), "connection refused on refresh version URL must return error");
+}
+
+#[tokio::test]
+async fn test_session_refresh_from_urls_invalid_json() {
+    let server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path("/version"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"versionToken":"v1"}"#))
+        .up_to_n_times(1)
+        .mount(&server)
+        .await;
+
+    // Second call returns invalid JSON
+    Mock::given(method("GET"))
+        .and(path("/version"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("not-json"))
+        .mount(&server)
+        .await;
+
+    Mock::given(method("GET"))
+        .and(path("/roles"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("ok"))
+        .mount(&server)
+        .await;
+
+    let client = HttpClient::new(None, 10, 0).unwrap();
+    let version_url = format!("{}/version", server.uri());
+    let roles_url = format!("{}/roles", server.uri());
+
+    let mut session = DrSession::new_from_urls(client, &version_url, &roles_url).await.unwrap();
+
+    let result = session.refresh_from_urls(&version_url, &roles_url).await;
+    assert!(result.is_err(), "invalid JSON in refresh version response must return error");
+}
+
+#[tokio::test]
+async fn test_session_refresh_from_urls_missing_version_token() {
+    let server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path("/version"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"versionToken":"v1"}"#))
+        .up_to_n_times(1)
+        .mount(&server)
+        .await;
+
+    // Second call returns JSON without versionToken
+    Mock::given(method("GET"))
+        .and(path("/version"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"other":"field"}"#))
+        .mount(&server)
+        .await;
+
+    Mock::given(method("GET"))
+        .and(path("/roles"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("ok"))
+        .mount(&server)
+        .await;
+
+    let client = HttpClient::new(None, 10, 0).unwrap();
+    let version_url = format!("{}/version", server.uri());
+    let roles_url = format!("{}/roles", server.uri());
+
+    let mut session = DrSession::new_from_urls(client, &version_url, &roles_url).await.unwrap();
+
+    let result = session.refresh_from_urls(&version_url, &roles_url).await;
+    assert!(result.is_err(), "missing versionToken in refresh response must return error");
+}
+
+#[tokio::test]
+async fn test_session_refresh_from_urls_roles_error() {
+    let server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path("/version"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"versionToken":"v1"}"#))
+        .up_to_n_times(1)
+        .mount(&server)
+        .await;
+
+    Mock::given(method("GET"))
+        .and(path("/version"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"versionToken":"v2"}"#))
+        .mount(&server)
+        .await;
+
+    Mock::given(method("GET"))
+        .and(path("/roles"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("ok"))
+        .up_to_n_times(1)
+        .mount(&server)
+        .await;
+
+    let client = HttpClient::new(None, 10, 0).unwrap();
+    let version_url = format!("{}/version", server.uri());
+    let roles_url = format!("{}/roles", server.uri());
+
+    let mut session = DrSession::new_from_urls(client, &version_url, &roles_url).await.unwrap();
+
+    let dead_roles_url = "http://127.0.0.1:1/dead-roles";
+    let result = session.refresh_from_urls(&version_url, dead_roles_url).await;
+    assert!(result.is_err(), "connection refused on refresh roles URL must return error");
+}

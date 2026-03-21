@@ -141,7 +141,7 @@ fn dirs_home() -> Option<PathBuf> {
 
 /// Try to read and deserialize a TOML config file.  Returns `None` when the
 /// file does not exist; propagates I/O or parse errors as `anyhow::Error`.
-fn try_load(path: &Path) -> anyhow::Result<Option<Config>> {
+pub fn try_load(path: &Path) -> anyhow::Result<Option<Config>> {
     match std::fs::read_to_string(path) {
         Ok(contents) => {
             let cfg: Config = toml::from_str(&contents)
