@@ -52,35 +52,30 @@ async fn dgsi_courts_returns_json_array() {
 }
 
 #[tokio::test]
-async fn dr_search_returns_501() {
+async fn dr_types_returns_json() {
     let app = test_router();
 
     let response = app
-        .oneshot(Request::builder().uri("/dr/search").body(Body::empty()).unwrap())
+        .oneshot(Request::builder().uri("/dr/types?format=json").body(Body::empty()).unwrap())
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::NOT_IMPLEMENTED);
+    assert_eq!(response.status(), StatusCode::OK);
 
     let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-    assert_eq!(json["error"], "DR module not implemented yet");
+    assert!(json.is_array(), "Expected JSON array, got: {json}");
+
+    let arr = json.as_array().unwrap();
+    assert!(!arr.is_empty(), "Act types list should not be empty");
+
+    let first = &arr[0];
+    assert!(first.get("alias").is_some(), "Missing alias field");
+    assert!(first.get("name").is_some(), "Missing name field");
 }
 
 #[tokio::test]
-async fn dr_today_returns_501() {
-    let app = test_router();
-
-    let response = app
-        .oneshot(Request::builder().uri("/dr/today").body(Body::empty()).unwrap())
-        .await
-        .unwrap();
-
-    assert_eq!(response.status(), StatusCode::NOT_IMPLEMENTED);
-}
-
-#[tokio::test]
-async fn dr_types_returns_501() {
+async fn dr_types_default_is_markdown() {
     let app = test_router();
 
     let response = app
@@ -88,7 +83,24 @@ async fn dr_types_returns_501() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::NOT_IMPLEMENTED);
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let content_type = response
+        .headers()
+        .get(axum::http::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    assert!(
+        content_type.starts_with("text/markdown"),
+        "Expected text/markdown content-type, got: {content_type}"
+    );
+
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body_str = std::str::from_utf8(&body).unwrap();
+    assert!(
+        body_str.contains("| Alias |"),
+        "Markdown response must contain the table header '| Alias |': {body_str}"
+    );
 }
 
 #[tokio::test]

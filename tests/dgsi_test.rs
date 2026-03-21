@@ -601,14 +601,3 @@ fn user_input_error_display() {
         "UserInput display should contain the message, got: {err}"
     );
 }
-
-// ---------------------------------------------------------------------------
-// dr::search stub (dr/mod.rs lines 5-6)
-// ---------------------------------------------------------------------------
-
-#[tokio::test]
-async fn dr_search_stub_returns_empty_vec() {
-    let result = lawyerr::dr::search().await;
-    assert!(result.is_ok(), "dr::search() should return Ok");
-    assert!(result.unwrap().is_empty(), "dr::search() should return an empty vec");
-}

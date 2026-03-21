@@ -1,0 +1,155 @@
+use serde_json::Value;
+use tracing::info;
+
+use crate::error::{LawyerrError, Result};
+use crate::http::{HttpClient, HttpFetcher};
+
+/// Hardcoded anonymous CSRF token from `OutSystems.js`.
+const CSRF_TOKEN: &str = "T6C+9iB49TLra4jEsMeSckDMNhQ=";
+
+/// API version hash for `DataActionGetPesquisas`.
+const API_VERSION: &str = "6Bnghy+TVcnOZSN2FpzXbQ";
+
+const BASE_URL: &str = "https://diariodarepublica.pt";
+const VERSION_INFO_URL: &str = "https://diariodarepublica.pt/dr/moduleservices/moduleversioninfo";
+const ROLES_URL: &str = "https://diariodarepublica.pt/dr/moduleservices/roles";
+
+/// Embedded body template (stripped of `_comment` keys at init time).
+const TEMPLATE_JSON: &str = include_str!("request_template.json");
+
+/// A DR session holds the HTTP client (with cookie jar), version tokens,
+/// and a parsed body template that is cloned and modified per search.
+pub struct DrSession {
+    client: HttpClient,
+    module_version: String,
+    api_version: String,
+    body_template: Value,
+}
+
+impl DrSession {
+    /// Initialise a new DR session.
+    ///
+    /// 1. GET `moduleversioninfo` to obtain the current `versionToken`.
+    /// 2. GET `roles` with `X-CSRFToken` header to set session cookies.
+    /// 3. Parse and clean the embedded body template.
+    pub async fn new(client: HttpClient) -> Result<Self> {
+        // Step 1: fetch module version
+        let version_text = client.get_text(VERSION_INFO_URL).await.map_err(|e| {
+            tracing::warn!(error = %e, "Failed to fetch DR module version info");
+            e
+        })?;
+
+        let version_json: Value =
+            serde_json::from_str(&version_text).map_err(|e| LawyerrError::Parse {
+                message: format!("Failed to parse moduleversioninfo JSON: {e}"),
+                source_url: VERSION_INFO_URL.to_owned(),
+            })?;
+
+        let module_version = version_json
+            .get("versionToken")
+            .and_then(Value::as_str)
+            .ok_or_else(|| LawyerrError::Parse {
+                message: "Missing versionToken in moduleversioninfo response".to_owned(),
+                source_url: VERSION_INFO_URL.to_owned(),
+            })?
+            .to_owned();
+
+        info!(module_version = %module_version, "DR module version obtained");
+
+        // Step 2: call roles endpoint to set session cookies on the jar
+        let _roles_response = client
+            .inner()
+            .get(ROLES_URL)
+            .header("X-CSRFToken", CSRF_TOKEN)
+            .send()
+            .await
+            .map_err(|e| LawyerrError::Http { source: e, url: ROLES_URL.to_owned() })?;
+
+        info!("DR session cookies set via roles endpoint");
+
+        // Step 3: parse and clean the embedded template
+        let mut template: Value =
+            serde_json::from_str(TEMPLATE_JSON).map_err(|e| LawyerrError::Parse {
+                message: format!("Failed to parse embedded DR body template: {e}"),
+                source_url: "embedded:dr_request_template.json".to_owned(),
+            })?;
+        strip_comment_keys(&mut template);
+
+        Ok(Self {
+            client,
+            module_version,
+            api_version: API_VERSION.to_owned(),
+            body_template: template,
+        })
+    }
+
+    pub const fn client(&self) -> &HttpClient {
+        &self.client
+    }
+
+    pub fn module_version(&self) -> &str {
+        &self.module_version
+    }
+
+    pub fn api_version(&self) -> &str {
+        &self.api_version
+    }
+
+    pub const fn body_template(&self) -> &Value {
+        &self.body_template
+    }
+
+    /// The hardcoded CSRF token used for all anonymous requests.
+    pub const fn csrf_token(&self) -> &str {
+        CSRF_TOKEN
+    }
+
+    /// The base URL for cookie domain operations.
+    pub const fn base_url() -> &'static str {
+        BASE_URL
+    }
+}
+
+/// Recursively remove all keys named `_comment` from a JSON value.
+fn strip_comment_keys(value: &mut Value) {
+    match value {
+        Value::Object(map) => {
+            map.remove("_comment");
+            for v in map.values_mut() {
+                strip_comment_keys(v);
+            }
+        }
+        Value::Array(arr) => {
+            for v in arr {
+                strip_comment_keys(v);
+            }
+        }
+        _ => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn strip_comment_keys_works() {
+        let mut val = serde_json::json!({
+            "_comment": "remove me",
+            "keep": "yes",
+            "nested": {
+                "_comment": "also remove",
+                "data": 42
+            },
+            "arr": [{"_comment": "gone", "x": 1}]
+        });
+        strip_comment_keys(&mut val);
+
+        assert!(val.get("_comment").is_none());
+        assert_eq!(val["keep"], "yes");
+        assert!(val["nested"].get("_comment").is_none());
+        assert_eq!(val["nested"]["data"], 42);
+        assert!(val["arr"][0].get("_comment").is_none());
+        assert_eq!(val["arr"][0]["x"], 1);
+    }
+}

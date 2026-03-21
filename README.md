@@ -4,7 +4,7 @@
 ![Release](https://img.shields.io/github/v/release/nikuscs/lawyerr)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
-**Fast Rust CLI for searching Portuguese court jurisprudence (DGSI), optimized for LLM consumption.**
+**Fast Rust CLI for searching Portuguese court jurisprudence (DGSI) and legislation (Diário da República), optimized for LLM consumption.**
 
 > **Disclaimer:** This project is for **educational purposes and AI automation research only**.
 > The authors are not responsible for any misuse or for any damages resulting from the use of this tool.
@@ -15,11 +15,12 @@
 
 > **Note:** This project was partially developed with AI assistance and may contain bugs or unexpected behavior. Use at your own risk.
 
-Search court decisions across all 10 Portuguese DGSI courts in parallel, with clean markdown output ready for LLM pipelines.
+Search court decisions across all 10 Portuguese DGSI courts in parallel and search legislation from Diário da República, with clean markdown output ready for LLM pipelines.
 
 ## Why?
 
 - **Parallel search** — queries all 10 DGSI courts simultaneously, results in seconds
+- **DR legislation search** — search Diário da República acts (Portarias, Decretos-Lei, etc.)
 - **LLM-ready output** — markdown by default with compact mode that strips boilerplate
 - **Latin-1 handling** — automatic ISO-8859-1 to UTF-8 decoding for DGSI's legacy encoding
 - **Flexible output** — Markdown, JSON, Table. Pipe to `jq`, feed to scripts, or read in terminal
@@ -79,6 +80,48 @@ lawyerr dgsi search "trabalho" --limit 10 --sort date
 lawyerr dgsi fetch "https://www.dgsi.pt/jstj.nsf/..."
 ```
 
+### Search Diário da República
+
+```bash
+# Search recent acts (1st series)
+lawyerr dr search --content atos-1 --recent 1w
+
+# Search for Portarias only
+lawyerr dr search --content atos-1 --type portaria --recent 1w
+
+# Full-text search
+lawyerr dr search "trabalho" --content atos-1 --recent 1m
+
+# Search 2nd series
+lawyerr dr search --content atos-2 --recent 1w
+
+# Search judicial decisions published in DR
+lawyerr dr search --content decisoes --recent 1m
+
+# Date range
+lawyerr dr search --since 2026-01-01 --until 2026-03-21
+
+# Multiple content types
+lawyerr dr search --content atos-1 --content atos-2 --recent 1w
+```
+
+**Content type aliases:** `atos-1` (1st series acts), `atos-2` (2nd series acts), `dr` (whole DR issues), `decisoes`/`jurisprudencia` (judicial decisions)
+
+### Today's publications
+
+```bash
+lawyerr dr today
+lawyerr dr today --type portaria
+```
+
+### List available act types
+
+```bash
+lawyerr dr types
+```
+
+**Act type aliases:** `portaria`, `lei`, `decreto-lei`, `despacho`, `decreto`, `aviso`, `resolucao` (Resolução do Conselho de Ministros), `retificacao`, `decreto-regulamentar`, `lei-organica`
+
 ### Output formats
 
 ```bash
@@ -106,6 +149,10 @@ Create `lawyerr.toml` in the current directory or `~/.config/lawyerr/lawyerr.tom
 ```toml
 [dgsi]
 courts = ["stj", "sta", "rel-porto", "rel-lisboa"]
+
+[dr]
+content_types = ["atos-1", "atos-2", "decisoes"]
+act_types = []
 
 [http]
 delay_ms = 100
@@ -144,6 +191,18 @@ curl http://localhost:3000/dgsi/courts
 
 # JSON output
 curl "http://localhost:3000/dgsi/search?q=usucapiao&format=json"
+
+# Search DR
+curl "http://localhost:3000/dr/search?content=atos-1&since=2026-03-01"
+
+# DR with act type filter
+curl "http://localhost:3000/dr/search?content=atos-1&type=portaria&limit=10"
+
+# Today's DR publications
+curl "http://localhost:3000/dr/today"
+
+# List DR act types
+curl "http://localhost:3000/dr/types?format=json"
 ```
 
 ## Docker
@@ -155,7 +214,7 @@ docker run -p 3000:3000 lawyerr serve
 
 ## Roadmap
 
-- **Diario da Republica (DR)** — legislation search is planned but not yet implemented
+- **DR document fetching** — individual document fetching from Diário da República (complex, low priority)
 
 ## Related Projects
 

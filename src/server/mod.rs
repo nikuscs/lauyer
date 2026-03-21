@@ -11,7 +11,7 @@ use crate::config::Config;
 use crate::error::LawyerrError;
 use crate::format::{OutputFormat, Renderable, SearchResponse};
 use crate::http::HttpClient;
-use crate::{dgsi, format};
+use crate::{dgsi, dr, format};
 
 // ---------------------------------------------------------------------------
 // AppState
@@ -246,10 +246,194 @@ async fn dgsi_fetch(
     Ok(format_response(&rendered, &fmt))
 }
 
-async fn dr_stub() -> (StatusCode, Json<ErrorBody>) {
+// ---------------------------------------------------------------------------
+// DR query params
+// ---------------------------------------------------------------------------
+
+#[derive(Deserialize)]
+pub struct DrSearchQueryParams {
+    pub q: Option<String>,
+    #[serde(rename = "type")]
+    pub act_type: Option<String>,
+    pub content: Option<String>,
+    pub since: Option<String>,
+    pub until: Option<String>,
+    pub limit: Option<u32>,
+    pub format: Option<String>,
+    pub compact: Option<bool>,
+}
+
+#[derive(Deserialize)]
+pub struct DrTodayQueryParams {
+    #[serde(rename = "type")]
+    pub act_type: Option<String>,
+    pub format: Option<String>,
+    pub compact: Option<bool>,
+}
+
+#[derive(Deserialize)]
+pub struct DrTypesQueryParams {
+    pub format: Option<String>,
+}
+
+// ---------------------------------------------------------------------------
+// DR handlers
+// ---------------------------------------------------------------------------
+
+async fn dr_search(
+    State(state): State<Arc<AppState>>,
+    Query(params): Query<DrSearchQueryParams>,
+) -> Result<Response, AppError> {
+    let client = HttpClient::new(None, 30, 3).map_err(AppError)?;
+    let session = dr::DrSession::new(client).await.map_err(AppError)?;
+
+    // Resolve content types
+    let content_aliases: Vec<String> = params.content.as_deref().map_or_else(
+        || state.config.dr.content_types.clone(),
+        |c| c.split(',').map(|s| s.trim().to_owned()).filter(|s| !s.is_empty()).collect(),
+    );
+
+    let content_types = dr::resolve_content_types(&content_aliases).map_err(AppError)?;
+
+    // Resolve act types
+    let mut act_types = Vec::new();
+    if let Some(ref type_str) = params.act_type {
+        for alias in type_str.split(',').map(str::trim).filter(|s| !s.is_empty()) {
+            let resolved = dr::resolve_act_type(alias).ok_or_else(|| {
+                AppError(LawyerrError::UserInput {
+                    message: format!("Unknown act type alias: '{alias}'"),
+                })
+            })?;
+            act_types.push(resolved);
+        }
+    }
+
+    // Parse dates
+    let since = params
+        .since
+        .as_deref()
+        .map(|s| {
+            s.parse::<chrono::NaiveDate>().map_err(|_| LawyerrError::UserInput {
+                message: format!("Invalid since date: '{s}'"),
+            })
+        })
+        .transpose()?;
+
+    let until = params
+        .until
+        .as_deref()
+        .map(|s| {
+            s.parse::<chrono::NaiveDate>().map_err(|_| LawyerrError::UserInput {
+                message: format!("Invalid until date: '{s}'"),
+            })
+        })
+        .transpose()?;
+
+    let search_params = dr::DrSearchParams {
+        content_types,
+        query: params.q.unwrap_or_default(),
+        act_types,
+        since,
+        until,
+        limit: params.limit.unwrap_or(50),
+    };
+
+    let response = dr::search(&session, &search_params).await.map_err(AppError)?;
+
+    let compact = params.compact.unwrap_or(state.config.output.compact);
+    let fmt = parse_output_format(params.format.as_deref());
+
+    let renderables: Vec<Box<dyn Renderable>> =
+        response.results.into_iter().map(|r| Box::new(r) as Box<dyn Renderable>).collect();
+
+    let search_response = SearchResponse {
+        source: "Diário da República".to_owned(),
+        query: search_params.query,
+        total: response.total,
+        results: renderables,
+    };
+    let rendered = format::render(&search_response, &fmt, compact, false);
+
+    Ok(format_response(&rendered, &fmt))
+}
+
+async fn dr_today(
+    State(state): State<Arc<AppState>>,
+    Query(params): Query<DrTodayQueryParams>,
+) -> Result<Response, AppError> {
+    let client = HttpClient::new(None, 30, 3).map_err(AppError)?;
+    let session = dr::DrSession::new(client).await.map_err(AppError)?;
+
+    let content_types =
+        dr::resolve_content_types(&state.config.dr.content_types).map_err(AppError)?;
+
+    let mut act_types = Vec::new();
+    if let Some(ref type_str) = params.act_type {
+        for alias in type_str.split(',').map(str::trim).filter(|s| !s.is_empty()) {
+            let resolved = dr::resolve_act_type(alias).ok_or_else(|| {
+                AppError(LawyerrError::UserInput {
+                    message: format!("Unknown act type alias: '{alias}'"),
+                })
+            })?;
+            act_types.push(resolved);
+        }
+    }
+
+    let today = chrono::Local::now().date_naive();
+    let search_params = dr::DrSearchParams {
+        content_types,
+        query: String::new(),
+        act_types,
+        since: Some(today),
+        until: Some(today),
+        limit: 50,
+    };
+
+    let response = dr::search(&session, &search_params).await.map_err(AppError)?;
+
+    let compact = params.compact.unwrap_or(state.config.output.compact);
+    let fmt = parse_output_format(params.format.as_deref());
+
+    let renderables: Vec<Box<dyn Renderable>> =
+        response.results.into_iter().map(|r| Box::new(r) as Box<dyn Renderable>).collect();
+
+    let search_response = SearchResponse {
+        source: "Diário da República — Today".to_owned(),
+        query: String::new(),
+        total: response.total,
+        results: renderables,
+    };
+    let rendered = format::render(&search_response, &fmt, compact, false);
+
+    Ok(format_response(&rendered, &fmt))
+}
+
+async fn dr_types(Query(params): Query<DrTypesQueryParams>) -> Response {
+    let types = dr::list_act_types();
+    let fmt = parse_output_format(params.format.as_deref());
+
+    if fmt == OutputFormat::Json {
+        let items: Vec<serde_json::Value> = types
+            .into_iter()
+            .map(|(alias, name)| serde_json::json!({"alias": alias, "name": name}))
+            .collect();
+        Json(items).into_response()
+    } else {
+        let mut out = String::from("| Alias | Act Type |\n|---|---|\n");
+        for (alias, name) in &types {
+            let _ = std::fmt::Write::write_fmt(&mut out, format_args!("| `{alias}` | {name} |\n"));
+        }
+        (StatusCode::OK, [(axum::http::header::CONTENT_TYPE, "text/markdown; charset=utf-8")], out)
+            .into_response()
+    }
+}
+
+async fn dr_fetch_stub() -> (StatusCode, Json<ErrorBody>) {
     (
         StatusCode::NOT_IMPLEMENTED,
-        Json(ErrorBody { error: "DR module not implemented yet".to_owned() }),
+        Json(ErrorBody {
+            error: "DR fetch not implemented yet — individual document fetching is complex and low priority".to_owned(),
+        }),
     )
 }
 
@@ -292,10 +476,10 @@ fn build_router(state: Arc<AppState>) -> Router {
         .route("/dgsi/search", get(dgsi_search))
         .route("/dgsi/fetch", get(dgsi_fetch))
         .route("/dgsi/courts", get(dgsi_courts))
-        .route("/dr/search", get(dr_stub))
-        .route("/dr/today", get(dr_stub))
-        .route("/dr/types", get(dr_stub))
-        .route("/dr/fetch", get(dr_stub))
+        .route("/dr/search", get(dr_search))
+        .route("/dr/today", get(dr_today))
+        .route("/dr/types", get(dr_types))
+        .route("/dr/fetch", get(dr_fetch_stub))
         .with_state(state)
 }
 

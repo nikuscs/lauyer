@@ -6,7 +6,7 @@ use clap::Parser as _;
 use futures::stream::{FuturesUnordered, StreamExt as _};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use lawyerr::format::Renderable;
-use lawyerr::{cli, config, dgsi, format, http, server};
+use lawyerr::{cli, config, dgsi, dr, format, http, server};
 
 #[tokio::main]
 #[allow(clippy::too_many_lines, clippy::literal_string_with_formatting_args)]
@@ -281,9 +281,200 @@ async fn main() -> anyhow::Result<()> {
             }
         },
 
-        cli::Commands::Dr { .. } => {
-            anyhow::bail!("DR module not implemented yet");
-        }
+        cli::Commands::Dr { command } => match command {
+            cli::DrCommands::Search(args) => {
+                let client = http::HttpClient::new(
+                    cli.proxy.as_deref().or(cfg.http.proxy.as_deref()),
+                    cfg.http.timeout_secs,
+                    cfg.http.retries,
+                )
+                .context("Failed to build HTTP client")?;
+
+                let pb = if quiet {
+                    None
+                } else {
+                    let pb = ProgressBar::new_spinner();
+                    pb.set_style(
+                        ProgressStyle::with_template("{spinner} {msg}")
+                            .unwrap_or_else(|_| ProgressStyle::default_spinner()),
+                    );
+                    pb.set_message("Initializing DR session...");
+                    pb.enable_steady_tick(std::time::Duration::from_millis(100));
+                    Some(pb)
+                };
+
+                let session =
+                    dr::DrSession::new(client).await.context("Failed to initialize DR session")?;
+
+                if let Some(ref pb) = pb {
+                    pb.set_message("Searching Diário da República...");
+                }
+
+                // Resolve content types
+                let content_aliases = if args.content.is_empty() {
+                    cfg.dr.content_types.clone()
+                } else {
+                    args.content.clone()
+                };
+                let content_types = dr::resolve_content_types(&content_aliases)
+                    .context("Failed to resolve content types")?;
+
+                // Resolve act types
+                let mut act_types = Vec::new();
+                for alias in &args.act_type {
+                    let resolved = dr::resolve_act_type(alias)
+                        .ok_or_else(|| anyhow::anyhow!("Unknown act type alias: '{alias}'"))?;
+                    act_types.push(resolved);
+                }
+
+                // Resolve dates
+                let since = match (&args.recent, &args.since) {
+                    (Some(recent), _) => {
+                        Some(format::parse_recent(recent).map_err(anyhow::Error::msg)?)
+                    }
+                    (None, Some(s)) => Some(
+                        s.parse::<chrono::NaiveDate>()
+                            .with_context(|| format!("Invalid --since date: '{s}'"))?,
+                    ),
+                    (None, None) => None,
+                };
+                let until = match &args.until {
+                    Some(u) => Some(
+                        u.parse::<chrono::NaiveDate>()
+                            .with_context(|| format!("Invalid --until date: '{u}'"))?,
+                    ),
+                    None => None,
+                };
+
+                let params = dr::DrSearchParams {
+                    content_types,
+                    query: args.query.clone().unwrap_or_default(),
+                    act_types,
+                    since,
+                    until,
+                    limit: args.limit,
+                };
+
+                let response = dr::search(&session, &params).await.context("DR search failed")?;
+
+                if let Some(pb) = pb {
+                    pb.finish_with_message(format!("done, {} results", response.total));
+                }
+
+                let renderables: Vec<Box<dyn Renderable>> = response
+                    .results
+                    .into_iter()
+                    .map(|r| Box::new(r) as Box<dyn Renderable>)
+                    .collect();
+
+                let search_response = format::SearchResponse {
+                    source: "Diário da República".to_owned(),
+                    query: params.query.clone(),
+                    total: response.total,
+                    results: renderables,
+                };
+                let rendered = format::render(&search_response, &fmt, compact, strip_sw);
+                format::write_output(&rendered, output_path)?;
+            }
+
+            cli::DrCommands::Today(args) => {
+                let client = http::HttpClient::new(
+                    cli.proxy.as_deref().or(cfg.http.proxy.as_deref()),
+                    cfg.http.timeout_secs,
+                    cfg.http.retries,
+                )
+                .context("Failed to build HTTP client")?;
+
+                let pb = if quiet {
+                    None
+                } else {
+                    let pb = ProgressBar::new_spinner();
+                    pb.set_style(
+                        ProgressStyle::with_template("{spinner} {msg}")
+                            .unwrap_or_else(|_| ProgressStyle::default_spinner()),
+                    );
+                    pb.set_message("Initializing DR session...");
+                    pb.enable_steady_tick(std::time::Duration::from_millis(100));
+                    Some(pb)
+                };
+
+                let session =
+                    dr::DrSession::new(client).await.context("Failed to initialize DR session")?;
+
+                if let Some(ref pb) = pb {
+                    pb.set_message("Fetching today's publications...");
+                }
+
+                // Resolve content types from config defaults
+                let content_types = dr::resolve_content_types(&cfg.dr.content_types)
+                    .context("Failed to resolve content types")?;
+
+                // Resolve act types
+                let mut act_types = Vec::new();
+                for alias in &args.act_type {
+                    let resolved = dr::resolve_act_type(alias)
+                        .ok_or_else(|| anyhow::anyhow!("Unknown act type alias: '{alias}'"))?;
+                    act_types.push(resolved);
+                }
+
+                let today = chrono::Local::now().date_naive();
+                let params = dr::DrSearchParams {
+                    content_types,
+                    query: String::new(),
+                    act_types,
+                    since: Some(today),
+                    until: Some(today),
+                    limit: 50,
+                };
+
+                let response = dr::search(&session, &params).await.context("DR search failed")?;
+
+                if let Some(pb) = pb {
+                    pb.finish_with_message(format!("done, {} results", response.total));
+                }
+
+                let renderables: Vec<Box<dyn Renderable>> = response
+                    .results
+                    .into_iter()
+                    .map(|r| Box::new(r) as Box<dyn Renderable>)
+                    .collect();
+
+                let search_response = format::SearchResponse {
+                    source: "Diário da República — Today".to_owned(),
+                    query: String::new(),
+                    total: response.total,
+                    results: renderables,
+                };
+                let rendered = format::render(&search_response, &fmt, compact, strip_sw);
+                format::write_output(&rendered, output_path)?;
+            }
+
+            cli::DrCommands::Types => {
+                let types = dr::list_act_types();
+                let out = if fmt == format::OutputFormat::Json {
+                    let items: Vec<serde_json::Value> = types
+                        .iter()
+                        .map(|(alias, name)| serde_json::json!({"alias": alias, "name": name}))
+                        .collect();
+                    serde_json::to_string_pretty(&items).unwrap_or_else(|_| "[]".to_owned())
+                } else {
+                    let mut md = String::new();
+                    let _ = writeln!(md, "| Alias | Act Type |");
+                    let _ = writeln!(md, "|---|---|");
+                    for (alias, name) in &types {
+                        let _ = writeln!(md, "| `{alias}` | {name} |");
+                    }
+                    md
+                };
+                format::write_output(&out, output_path)?;
+            }
+
+            cli::DrCommands::Fetch { .. } => {
+                anyhow::bail!(
+                    "DR fetch not implemented yet — individual document fetching is complex and low priority"
+                );
+            }
+        },
 
         cli::Commands::Serve(args) => {
             let http_client = http::HttpClient::new(
