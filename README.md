@@ -176,10 +176,9 @@ If you are an AI agent, you can use `lauyer` as a skill to search Portuguese leg
 
 ### Quick setup
 
-```bash
-# Install
-cargo install --git https://github.com/nikuscs/lauyer
+Download the pre-compiled binary for your platform from [Releases](https://github.com/nikuscs/lauyer/releases) and place it in your `PATH`.
 
+```bash
 # Search jurisprudence (returns markdown by default)
 lauyer dgsi search "usucapião" --court stj --limit 5 --format json
 
