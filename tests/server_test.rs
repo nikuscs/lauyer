@@ -32,7 +32,7 @@ async fn dgsi_courts_returns_json_array() {
     let app = test_router();
 
     let response = app
-        .oneshot(Request::builder().uri("/dgsi/courts").body(Body::empty()).unwrap())
+        .oneshot(Request::builder().uri("/dgsi/courts?format=json").body(Body::empty()).unwrap())
         .await
         .unwrap();
 
@@ -185,7 +185,7 @@ async fn dgsi_courts_response_structure() {
     let app = test_router();
 
     let response = app
-        .oneshot(Request::builder().uri("/dgsi/courts").body(Body::empty()).unwrap())
+        .oneshot(Request::builder().uri("/dgsi/courts?format=json").body(Body::empty()).unwrap())
         .await
         .unwrap();
 

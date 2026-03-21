@@ -103,11 +103,27 @@ async fn health() -> Json<HealthResponse> {
     Json(HealthResponse { status: "ok", version: "0.1.0" })
 }
 
-async fn dgsi_courts() -> Json<Vec<CourtInfo>> {
+#[derive(Deserialize)]
+pub struct CourtsParams {
+    pub format: Option<String>,
+}
+
+async fn dgsi_courts(Query(params): Query<CourtsParams>) -> Response {
     let courts = dgsi::list_courts();
-    let infos: Vec<CourtInfo> =
-        courts.into_iter().map(|(alias, name)| CourtInfo { alias, name }).collect();
-    Json(infos)
+    let fmt = parse_output_format(params.format.as_deref());
+
+    if fmt == OutputFormat::Json {
+        let infos: Vec<CourtInfo> =
+            courts.into_iter().map(|(alias, name)| CourtInfo { alias, name }).collect();
+        Json(infos).into_response()
+    } else {
+        let mut out = String::from("| Alias | Court |\n|---|---|\n");
+        for (alias, name) in &courts {
+            let _ = std::fmt::Write::write_fmt(&mut out, format_args!("| `{alias}` | {name} |\n"));
+        }
+        (StatusCode::OK, [(axum::http::header::CONTENT_TYPE, "text/markdown; charset=utf-8")], out)
+            .into_response()
+    }
 }
 
 async fn dgsi_search(

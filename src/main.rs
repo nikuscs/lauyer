@@ -1,5 +1,4 @@
 use std::fmt::Write as FmtWrite;
-use std::io::Write as _;
 use std::sync::Arc;
 
 use anyhow::Context as _;
@@ -261,11 +260,22 @@ async fn main() -> anyhow::Result<()> {
 
             cli::DgsiCommands::Courts => {
                 let courts = dgsi::list_courts();
-                let mut out = String::new();
-                for (alias, name) in courts {
-                    let _ = writeln!(out, "{alias:<20} {name}");
-                }
-                std::io::stdout().write_all(out.as_bytes())?;
+                let out = if fmt == format::OutputFormat::Json {
+                    let items: Vec<serde_json::Value> = courts
+                        .iter()
+                        .map(|(alias, name)| serde_json::json!({"alias": alias, "name": name}))
+                        .collect();
+                    serde_json::to_string_pretty(&items).unwrap_or_else(|_| "[]".to_owned())
+                } else {
+                    let mut md = String::new();
+                    let _ = writeln!(md, "| Alias | Court |");
+                    let _ = writeln!(md, "|---|---|");
+                    for (alias, name) in &courts {
+                        let _ = writeln!(md, "| `{alias}` | {name} |");
+                    }
+                    md
+                };
+                format::write_output(&out, output_path)?;
             }
         },
 
