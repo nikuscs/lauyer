@@ -175,21 +175,113 @@ RUST_LOG=debug lawyerr --config /tmp/lawyerr_test.toml dgsi search "fiança" --c
 
 ---
 
-## CLI — DR Module (stubs)
+## CLI — DR (Diário da República)
 
-### `dr search` — Not implemented
+### `dr types`
 ```bash
-lawyerr dr search "portaria"
+lawyerr dr types
 ```
-- [ ] Prints info message, exits cleanly (no panic)
+- [ ] Lists all act type aliases as markdown table
+- [ ] Includes portaria, decreto-lei, lei, despacho, etc.
 
-### `dr today` / `dr types` / `dr fetch`
+### `dr search` — Portarias (past week)
+```bash
+lawyerr dr search --type portaria --recent 1w
+```
+- [ ] Returns real Portarias from Diário da República
+- [ ] Each result has tipo, número, emissor, sumário
+- [ ] Dates within the last week
+
+### `dr search` — Decretos-Lei (past month)
+```bash
+lawyerr dr search --type decreto-lei --recent 1m
+```
+- [ ] Returns Decretos-Lei
+- [ ] Different results from portaria search
+
+### `dr search` — Full-text search
+```bash
+lawyerr dr search "trabalho" --recent 1m
+```
+- [ ] Text search across all act types
+- [ ] Returns results containing "trabalho" in content
+
+### `dr search` — JSON output
+```bash
+lawyerr --format json dr search --type portaria --recent 1w --limit 3
+```
+- [ ] Valid JSON (pipe to `jq .`)
+- [ ] Each result has tipo, numero, emissor, sumario, data_publicacao, serie
+
+### `dr search` — Table output
+```bash
+lawyerr --format table dr search --type lei --recent 6m --limit 5
+```
+- [ ] Aligned table with Date, Tipo, Número, Emissor columns
+
+### `dr search` — Date range
+```bash
+lawyerr dr search --type portaria --since 2026-03-01 --until 2026-03-15
+```
+- [ ] Results only from the specified date range
+
+### `dr search` — Multiple act types
+```bash
+lawyerr dr search --type portaria --type decreto-lei --recent 2w
+```
+- [ ] Returns both Portarias and Decretos-Lei
+
+### `dr search` — Content type: Atos 2ª Série
+```bash
+lawyerr dr search --content atos-2 --type despacho --recent 1w
+```
+- [ ] Returns Despachos from 2nd series
+- [ ] Different content from atos-1
+
+### `dr search` — Content type: Decisões Judiciais
+```bash
+lawyerr dr search --content decisoes --recent 1m --limit 3
+```
+- [ ] Returns judicial decisions published in DR
+
+### `dr today`
 ```bash
 lawyerr dr today
-lawyerr dr types
+```
+- [ ] Returns today's publications (may be empty on weekends)
+- [ ] Session init visible in logs
+
+### `dr today` — With type filter
+```bash
+lawyerr dr today --type portaria
+```
+- [ ] Only Portarias from today
+
+### `dr search` — With --quiet and pipe
+```bash
+lawyerr --quiet --format json dr search --type portaria --recent 1w --limit 3 | jq '.results | length'
+```
+- [ ] Clean JSON output, no progress bars
+- [ ] `jq` parses successfully
+
+### `dr search` — Output to file
+```bash
+lawyerr --output /tmp/dr_results.json dr search --type portaria --recent 1w --limit 5
+cat /tmp/dr_results.json | jq .total
+```
+- [ ] File created with valid JSON
+
+### `dr search` — Strip stopwords
+```bash
+lawyerr --strip-stopwords dr search "regulamento" --type portaria --recent 1m --limit 2
+```
+- [ ] Stop words removed from sumário text
+
+### `dr fetch` — Not implemented
+```bash
 lawyerr dr fetch "https://example.com"
 ```
-- [ ] All print info message, exit cleanly
+- [ ] Returns error (not implemented yet)
 
 ---
 
@@ -287,4 +379,12 @@ lawyerr --format table dgsi search "$QUERY" --court stj --limit 2
 | Boolean operators (AND) | ✅ | Domino boolean works |
 | Special chars (artigo 1292º) | ✅ | Handles º correctly |
 | Pagination 60 results | ✅ | 2-page fetch works |
-| DR stubs | ✅ | All exit cleanly |
+| dr types | ✅ | 10 act types with aliases |
+| dr search portaria 1w | ✅ | 25 real Portarias returned |
+| dr search decreto-lei 1m | ✅ | Decretos-Lei returned |
+| dr search full-text "trabalho" | ✅ | Text search returns results |
+| dr search JSON output | ✅ | Valid JSON, jq parses (25 results) |
+| dr search table output | ✅ | Aligned table with Date/Tipo/Número/Emissor |
+| dr today | ✅ | Returns 0 on weekend (expected) |
+| dr search --quiet pipe jq | ✅ | Clean pipe, jq parses |
+| dr fetch | ✅ | Returns error with exit 1 (not implemented) |
