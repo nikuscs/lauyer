@@ -170,6 +170,43 @@ docker build -t lauyer .
 docker run -p 3000:3000 lauyer serve
 ```
 
+## AI Agents
+
+If you are an AI agent, you can use `lauyer` as a skill to search Portuguese legal databases. Install the binary and call it directly from your tool/shell integration.
+
+### Quick setup
+
+```bash
+# Install
+cargo install --git https://github.com/nikuscs/lauyer
+
+# Search jurisprudence (returns markdown by default)
+lauyer dgsi search "usucapião" --court stj --limit 5 --format json
+
+# Search legislation
+lauyer dr search "trabalho" --type decreto-lei --recent 1m --format json
+
+# Fetch a full court decision
+lauyer dgsi fetch "https://www.dgsi.pt/jstj.nsf/..." --format json
+```
+
+### As a REST API
+
+```bash
+lauyer serve --port 3000
+# Then call endpoints: GET /dgsi/search?q=usucapiao&court=stj&limit=5&format=json
+```
+
+### Tips for agents
+
+- Use `--format json` for structured output you can parse
+- Use `--limit` to control result count and stay within context limits
+- Use `--fetch-full` on searches to get full decision text inline
+- Use `--no-compact` if you need the full unprocessed legal text
+- Pipe through `jq` for field extraction: `lauyer dgsi search "dano" --format json | jq '.[].summary'`
+
+Feel free to copy and adapt this tool's interface into your own skill definitions or MCP server configurations.
+
 ## Related Projects
 
 - [🕷️ crauler](https://github.com/nikuscs/crauler) — Web crawler with proxy routing and HTML→Markdown
