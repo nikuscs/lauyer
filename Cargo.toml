@@ -16,6 +16,7 @@ clap = { version = "4", features = ["derive", "env"] }
 
 # Async
 tokio = { version = "1", features = ["full"] }
+futures = "0.3"
 
 # HTTP
 reqwest = { version = "0.12", features = ["gzip", "brotli", "socks", "json", "cookies"] }
@@ -33,6 +34,9 @@ encoding_rs = "0.8"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "0.8"
+
+# URL percent-encoding (for DGSI search queries)
+percent-encoding = "2"
 
 # Base64 (for DR search params)
 base64 = "0.22"
