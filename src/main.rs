@@ -365,6 +365,7 @@ async fn main() -> anyhow::Result<()> {
                 };
 
                 let response = dr::search(&session, &params).await.context("DR search failed")?;
+                let response = dr::apply_limit(response, args.limit);
 
                 if let Some(pb) = pb {
                     pb.finish_with_message(format!("done, {} results", response.total));

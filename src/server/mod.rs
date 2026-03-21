@@ -13,6 +13,8 @@ use crate::format::{OutputFormat, Renderable, SearchResponse};
 use crate::http::HttpClient;
 use crate::{dgsi, dr, format};
 
+const DEFAULT_SEARCH_LIMIT: u32 = 50;
+
 // ---------------------------------------------------------------------------
 // AppState
 // ---------------------------------------------------------------------------
@@ -155,7 +157,7 @@ async fn dgsi_search(
         .transpose()?;
 
     let query = dgsi::build_query(&params.q, since, until, None);
-    let limit = params.limit.unwrap_or(50);
+    let limit = params.limit.unwrap_or(DEFAULT_SEARCH_LIMIT);
     let sort_by_date = params.sort.as_deref() == Some("date");
     let fetch_full = params.fetch_full.unwrap_or(false);
     let compact = params.compact.unwrap_or(state.config.output.compact);
@@ -282,6 +284,8 @@ async fn dr_search(
     State(state): State<Arc<AppState>>,
     Query(params): Query<DrSearchQueryParams>,
 ) -> Result<Response, AppError> {
+    // Fresh client per request: DR sessions set CSRF + search cookies on the jar,
+    // so sharing AppState.http_client would cause cross-request cookie contamination.
     let client = HttpClient::new(
         state.config.http.proxy.as_deref(),
         state.config.http.timeout_secs,
@@ -339,10 +343,12 @@ async fn dr_search(
         series: vec![],
         since,
         until,
-        limit: params.limit.unwrap_or(50),
+        limit: params.limit.unwrap_or(DEFAULT_SEARCH_LIMIT),
     };
 
     let response = dr::search(&session, &search_params).await.map_err(AppError)?;
+    let limit = search_params.limit;
+    let response = dr::apply_limit(response, limit);
 
     let compact = params.compact.unwrap_or(state.config.output.compact);
     let fmt = parse_output_format(params.format.as_deref());
@@ -396,7 +402,7 @@ async fn dr_today(
         series: vec![],
         since: Some(today),
         until: Some(today),
-        limit: 50,
+        limit: DEFAULT_SEARCH_LIMIT,
     };
 
     let response = dr::search(&session, &search_params).await.map_err(AppError)?;

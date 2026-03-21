@@ -52,6 +52,16 @@ pub struct DrSearchResponse {
 }
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/// Serialize a `serde_json::Value` to a JSON string.
+/// `Value` keys are always strings so `to_string` is infallible.
+fn serialize_value(value: &Value) -> String {
+    serde_json::to_string(value).unwrap_or_default()
+}
+
+// ---------------------------------------------------------------------------
 // Cookie builder
 // ---------------------------------------------------------------------------
 
@@ -59,18 +69,18 @@ pub struct DrSearchResponse {
 pub fn build_pesquisa_cookie(params: &DrSearchParams) -> String {
     // 1. Build cookie filtros JSON (compact, plain arrays)
     let filtros = build_cookie_filtros(params);
-    let filtros_json = serde_json::to_string(&filtros).unwrap_or_default();
+    let filtros_json = serialize_value(&filtros);
 
     // 2. Base64-encode
     let filtros_b64 = base64::engine::general_purpose::STANDARD.encode(filtros_json.as_bytes());
 
     // 3. Build bools JSON
     let bools = build_bools(params);
-    let bools_json = serde_json::to_string(&bools).unwrap_or_default();
+    let bools_json = serialize_value(&bools);
 
     // 4. Build sort fields JSON
     let sort_fields = build_sort_fields();
-    let sort_json = serde_json::to_string(&sort_fields).unwrap_or_default();
+    let sort_json = serialize_value(&sort_fields);
 
     // 5. Build wrapper with JSON-as-string values (double-encoded)
     let wrapper = json!({
@@ -78,7 +88,7 @@ pub fn build_pesquisa_cookie(params: &DrSearchParams) -> String {
         "PesquisaAvancadaBools": bools_json,
         "SortFields": sort_json,
     });
-    let wrapper_json = serde_json::to_string(&wrapper).unwrap_or_default();
+    let wrapper_json = serialize_value(&wrapper);
 
     // 6. URL-encode
     percent_encoding::utf8_percent_encode(&wrapper_json, percent_encoding::NON_ALPHANUMERIC)
@@ -168,13 +178,13 @@ pub fn build_search_body(session: &DrSession, params: &DrSearchParams) -> Value 
 
     // PesquisaAvancadaFiltros (base64 string)
     let cookie_filtros = build_cookie_filtros(params);
-    let filtros_json = serde_json::to_string(&cookie_filtros).unwrap_or_default();
+    let filtros_json = serialize_value(&cookie_filtros);
     let filtros_b64 = base64::engine::general_purpose::STANDARD.encode(filtros_json.as_bytes());
     body["screenData"]["variables"]["PesquisaAvancadaFiltros"] = Value::String(filtros_b64);
 
     // PesquisaAvancadaBools (JSON string)
     let bools = build_bools(params);
-    let bools_json = serde_json::to_string(&bools).unwrap_or_default();
+    let bools_json = serialize_value(&bools);
     body["screenData"]["variables"]["PesquisaAvancadaBools"] = Value::String(bools_json);
 
     // Date fields
@@ -195,18 +205,18 @@ pub fn build_search_body(session: &DrSession, params: &DrSearchParams) -> Value 
 
     // Decoded URL pesquisa avancada
     let sort_fields = build_sort_fields();
-    let sort_json = serde_json::to_string(&sort_fields).unwrap_or_default();
+    let sort_json = serialize_value(&sort_fields);
     let cookie_filtros2 = build_cookie_filtros(params);
-    let filtros_json2 = serde_json::to_string(&cookie_filtros2).unwrap_or_default();
+    let filtros_json2 = serialize_value(&cookie_filtros2);
     let filtros_b64_2 = base64::engine::general_purpose::STANDARD.encode(filtros_json2.as_bytes());
     let bools2 = build_bools(params);
-    let bools_json2 = serde_json::to_string(&bools2).unwrap_or_default();
+    let bools_json2 = serialize_value(&bools2);
     let decoded_wrapper = json!({
         "PesquisaAvancadaFiltros": filtros_b64_2,
         "PesquisaAvancadaBools": bools_json2,
         "SortFields": sort_json,
     });
-    let decoded_json = serde_json::to_string(&decoded_wrapper).unwrap_or_default();
+    let decoded_json = serialize_value(&decoded_wrapper);
     body["screenData"]["variables"]["GetDecodeURLPesquisaAvancada"]["PesquisaAvancada_URL_Decoded"] =
         Value::String(decoded_json);
 
@@ -405,6 +415,15 @@ pub fn parse_search_response(response_text: &str) -> Result<DrSearchResponse> {
     info!(total, result_count = results.len(), "DR search results parsed");
 
     Ok(DrSearchResponse { total, results })
+}
+
+/// Apply a limit to search results, truncating if needed.
+pub fn apply_limit(mut response: DrSearchResponse, limit: u32) -> DrSearchResponse {
+    let limit = limit as usize;
+    if response.results.len() > limit {
+        response.results.truncate(limit);
+    }
+    response
 }
 
 /// Parse a single ES hit `_source` into a `DrSearchResult`.
