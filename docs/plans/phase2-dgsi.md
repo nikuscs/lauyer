@@ -6,6 +6,11 @@
 
 **Ref:** See `docs/plans/initial.md` — DGSI sections for HTML structure, encoding, courts table, query syntax.
 
+**Reference projects:**
+- `~/projects/crauler` — `encoding_rs` Latin-1 decoding, `scraper` HTML parsing, `htmd` HTML→markdown. Check `crates/crauler/src/` for patterns.
+- `~/projects/amz-crawler` — `scraper` CSS selectors for parsing (`src/amazon/parser.rs`, `src/amazon/selectors.rs`). Check for HTML parsing patterns.
+- `~/projects/scrauper` — Parallel fetching with semaphore + retry (`src/api/rate_limiter.rs`, `src/api/retry.rs`). Check for concurrency/retry patterns.
+
 ---
 
 ## Checklist

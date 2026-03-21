@@ -6,6 +6,10 @@
 
 **Ref:** See `docs/plans/initial.md` — DR sections for session flow, content types, field mapping, test results. See `docs/dr_request_template.json` for the ~30KB POST body template.
 
+**Reference projects:**
+- `~/projects/olx-tracker` — reqwest cookie jar + session management (`src/api/client.rs`). Check for: proxy handling, browser-like headers, cookie-based auth.
+- `~/projects/amz-crawler` — TLS fingerprinting + custom headers (`src/amazon/client.rs`). Check for: anti-bot header patterns, request building.
+
 ---
 
 ## Checklist

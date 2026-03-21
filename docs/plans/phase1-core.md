@@ -4,6 +4,13 @@
 
 **Ref:** See `docs/plans/initial.md` for full context. See `docs/dr_request_template.json` for DR body template.
 
+**Reference projects** (same author, same quality standards — check these for patterns):
+- `~/projects/amz-crawler` — HTTP client with TLS fingerprinting, clap CLI, config layering, output formats (table/json/markdown/csv). Good reference for: Cargo.toml metadata, clippy lints, CI workflow, README style.
+- `~/projects/olx-tracker` — reqwest + cookie jar, Axum server wrapping CLI, SQLite, notifications. Good reference for: server mode (`src/server/`), proxy handling, config with TOML, `fake_user_agent`.
+- `~/projects/scrauper` — Rate limiting (semaphore + governor), retry with exponential backoff, progress bars (indicatif), parallel downloads. Good reference for: concurrency patterns, retry logic, progress feedback.
+- `~/projects/crauler` — Workspace project, proxy router module, HTML-to-markdown (`htmd`), encoding (`encoding_rs`). Good reference for: proxy architecture, HTML→markdown conversion, Latin-1 decoding.
+- `~/projects/ts-code-scan` — Lean CLI, rayon parallelism, `ignore` crate for file walking. Good reference for: simple clean architecture, compact output formats.
+
 ---
 
 ## Checklist

@@ -4,6 +4,10 @@
 
 **Depends on:** Phase 2 (DGSI), Phase 3 (DR), Phase 4 (formatting)
 
+**Reference projects:**
+- `~/projects/olx-tracker` — Axum server wrapping CLI commands (`src/server/`). Check for: router setup, handler patterns, AppState, graceful shutdown. This is the closest reference for `lawyerr serve`.
+- `~/projects/crauler` — Axum server with proxy routing. Check `crates/crauler/src/` for server patterns.
+
 ---
 
 ## Checklist
