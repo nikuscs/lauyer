@@ -889,9 +889,9 @@ checksum = "fc0fef456e4baa96da950455cd02c081ca953b141298e41db3fc7e36b1da849c"
 
 [[package]]
 name = "htmd"
-version = "0.5.2"
+version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7c7dc50d9fc45420821992986b3840b968c9e564f8261516d89d50c8f2edcff"
+checksum = "de550515ae03ff01fb033658945ba393c8db391297978a1f988ecb436e072f87"
 dependencies = [
  "html5ever 0.36.1",
  "markup5ever_rcdom",
