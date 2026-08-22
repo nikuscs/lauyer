@@ -39,7 +39,7 @@ toml = "1"
 percent-encoding = "2"
 
 # Base64 (for DR search params)
-base64 = "0.22"
+base64 = "0.23"
 
 # HTTP server
 axum = "0.8"
